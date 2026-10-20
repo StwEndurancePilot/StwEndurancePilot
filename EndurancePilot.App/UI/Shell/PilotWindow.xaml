@@ -1,0 +1,159 @@
+<ui:FluentWindow x:Class="EndurancePilot.App.PilotWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml" xmlns:local="clr-namespace:EndurancePilot.App" Title="Endurance Pilot" Icon="/Branding/Pilot.ico" Width="480" Height="690" MinWidth="420" MinHeight="640" WindowStartupLocation="CenterScreen" ExtendsContentIntoTitleBar="True" WindowBackdropType="None" Background="{DynamicResource PilotBackground}" Foreground="{DynamicResource PilotText}" FontFamily="Segoe UI Variable, Segoe UI" UseLayoutRounding="True" SnapsToDevicePixels="True">
+  <Grid Background="{DynamicResource PilotBackground}" ClipToBounds="True">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="34" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <ui:TitleBar Title="Endurance Pilot" ShowMaximize="False" FontSize="11" />
+    <local:UpdateBanner x:Name="UpdateNotice" Grid.Row="1" Margin="28,12,28,0" Visibility="Collapsed" DownloadRequested="OpenUpdateClicked" />
+    <Grid x:Name="MainView" Grid.Row="2" Grid.RowSpan="2">
+      <Grid.RenderTransform>
+        <TranslateTransform x:Name="MainSlide" />
+      </Grid.RenderTransform>
+      <Grid.RowDefinitions>
+        <RowDefinition />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+      <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel x:Name="DashboardContent" Margin="28,15,28,12">
+          <Grid Margin="0,0,0,24">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Border CornerRadius="12" Width="46" Height="46" Margin="0,1,14,0" VerticalAlignment="Top">
+              <Border.Background>
+                <ImageBrush ImageSource="/Branding/Pilot.png" Stretch="Uniform" />
+              </Border.Background>
+            </Border>
+            <StackPanel Grid.Column="1">
+              <TextBlock Text="ENDURANCE" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PilotSecondary}" />
+              <TextBlock Text="Pilot" FontSize="32" FontWeight="SemiBold" Margin="-1,-3,0,0" />
+            </StackPanel>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+              <Border x:Name="ThemeIndicator" VerticalAlignment="Center" Padding="9,7" CornerRadius="8" BorderThickness="1" BorderBrush="{DynamicResource PilotBorder}" ToolTip="Theme follows Windows">
+                <StackPanel Orientation="Horizontal">
+                  <ui:SymbolIcon x:Name="ThemeIcon" Symbol="WeatherMoon24" FontSize="15" Foreground="{DynamicResource PilotSecondary}" />
+                  <TextBlock Text="Auto" FontSize="11" Margin="6,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource PilotSecondary}" />
+                </StackPanel>
+              </Border>
+              <ui:Button x:Name="ThemeButton" Appearance="Transparent" Width="34" Height="34" Padding="0" Visibility="Collapsed" Click="ThemeClicked" ToolTip="Switch theme" AutomationProperties.Name="Switch theme">
+                <ui:SymbolIcon x:Name="ManualThemeIcon" Symbol="WeatherSunny24" FontSize="19" Foreground="{DynamicResource PilotSecondary}" />
+              </ui:Button>
+              <ui:Button x:Name="SettingsButton" Appearance="Transparent" Width="34" Height="34" Padding="0" Margin="8,0,0,0" Click="SettingsClicked" ToolTip="Settings" AutomationProperties.Name="Settings">
+                <ui:SymbolIcon Symbol="Settings24" FontSize="19" Foreground="{DynamicResource PilotSecondary}" />
+              </ui:Button>
+            </StackPanel>
+          </Grid>
+          <Grid Margin="1,0,1,14">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="Headline" FontSize="14" FontWeight="Medium" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+              <Ellipse x:Name="StatusDot" Width="6" Height="6" Fill="{DynamicResource PilotMuted}" Margin="0,0,7,0" />
+              <TextBlock x:Name="StatusBadge" Text="Idle" FontSize="11" Foreground="{DynamicResource PilotSecondary}" />
+            </StackPanel>
+          </Grid>
+          <Border CornerRadius="18" Background="{DynamicResource PilotSurface}" BorderBrush="{DynamicResource PilotBorder}" BorderThickness="1" ClipToBounds="True">
+            <Grid>
+              <Canvas HorizontalAlignment="Right" VerticalAlignment="Top" Width="150" Height="185" Opacity="0.38" IsHitTestVisible="False">
+                <Path Data="M 65,0 L 150,85 M 105,0 L 150,45 M 25,0 L 150,125 M -15,0 L 150,165" Stroke="{DynamicResource PilotBorder}" StrokeThickness="1" />
+              </Canvas>
+              <StackPanel Margin="24,20,24,20">
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Text="WAVE PROGRESS" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PilotSecondary}" />
+                </Grid>
+                <Grid Margin="-4,4,0,8">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock x:Name="WaveNumber" Text="00" FontFamily="Bahnschrift, Segoe UI" FontSize="104" FontWeight="SemiBold" Foreground="{DynamicResource PilotAccent}" />
+                  <TextBlock x:Name="WaveTarget" Text="/ 30" Grid.Column="1" FontSize="24" Margin="12,0,0,19" VerticalAlignment="Bottom" Foreground="{DynamicResource PilotSecondary}" />
+                </Grid>
+                <UniformGrid x:Name="WaveSegments" Rows="1" Height="23" Margin="0,0,0,15" />
+                <TextBlock x:Name="WaveCaption" Visibility="Collapsed" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource PilotSecondary}" />
+              </StackPanel>
+            </Grid>
+          </Border>
+          <Grid Margin="4,22,4,22">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition />
+              <ColumnDefinition Width="1" />
+              <ColumnDefinition />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+              <TextBlock Text="Session time" FontSize="11" Foreground="{DynamicResource PilotSecondary}" />
+              <TextBlock x:Name="ElapsedText" Text="00:00:00" FontFamily="Bahnschrift, Segoe UI" FontSize="28" Margin="0,6,0,0" />
+            </StackPanel>
+            <Border Grid.Column="1" Background="{DynamicResource PilotBorder}" Margin="0,3,0,3" />
+            <StackPanel Grid.Column="2" Margin="26,0,0,0">
+              <TextBlock Text="Completed runs" FontSize="11" Foreground="{DynamicResource PilotSecondary}" />
+              <TextBlock x:Name="CompletedText" Text="0" FontFamily="Bahnschrift, Segoe UI" FontSize="28" Margin="0,6,0,0" />
+            </StackPanel>
+          </Grid>
+          <ComboBox x:Name="EarningsView" SelectedIndex="0" Height="34" Margin="0,0,0,10" SelectionChanged="EarningsViewChanged" AutomationProperties.Name="Reward totals view">
+            <ComboBoxItem Content="This session" />
+            <ComboBoxItem Content="Latest mission" />
+            <ComboBoxItem Content="Lifetime earnings" />
+          </ComboBox>
+          <local:RewardPanel x:Name="MissionRewards" Margin="0,0,0,20" />
+          <Grid x:Name="SetupFields">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition />
+              <ColumnDefinition x:Name="AttemptGap" Width="0" />
+              <ColumnDefinition x:Name="AttemptColumn" Width="0" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+              <TextBlock Text="Homebase" FontSize="12" Margin="0,0,0,8" Foreground="{DynamicResource PilotSecondary}" />
+              <ComboBox x:Name="ZoneChoice" DisplayMemberPath="Label" SelectedValuePath="Zone" Height="38" AutomationProperties.Name="Homebase" />
+            </StackPanel>
+            <StackPanel x:Name="AttemptFields" Grid.Column="2" Visibility="Collapsed">
+              <TextBlock Text="Attempts" FontSize="12" Margin="0,0,0,8" Foreground="{DynamicResource PilotSecondary}" />
+              <ui:NumberBox x:Name="AttemptInput" Value="1" Minimum="1" Maximum="100" MaxDecimalPlaces="0" AcceptsExpression="False" Height="38" AutomationProperties.Name="Attempt limit" />
+            </StackPanel>
+          </Grid>
+          <TextBlock x:Name="AttemptSummary" Text="Stops automatically at your limit." FontSize="11" Margin="0,9,0,0" Foreground="{DynamicResource PilotMuted}" />
+        </StackPanel>
+      </ScrollViewer>
+      <Border x:Name="RunControls" Grid.Row="1" Padding="28,16,28,18" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource PilotBorder}" Background="{DynamicResource PilotBackground}">
+        <StackPanel>
+          <TextBlock x:Name="StatusDetail" Visibility="Collapsed" />
+          <ui:Button x:Name="ResumeButton" Content="Resume in Fortnite" Visibility="Collapsed" HorizontalAlignment="Stretch" Height="38" Margin="0,0,0,8" Click="ResumeClicked" AutomationProperties.Name="Resume in Fortnite" />
+          <ui:Button x:Name="PrimaryButton" Appearance="Primary" CornerRadius="10" Height="54" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Click="PrimaryClicked" AutomationProperties.Name="Start endurance">
+            <Grid Margin="6,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBlock x:Name="PrimaryText" Text="Start endurance" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
+              <ui:SymbolIcon x:Name="PrimaryIcon" Grid.Column="1" Symbol="Play24" FontSize="20" VerticalAlignment="Center" />
+            </Grid>
+          </ui:Button>
+          <Grid Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="ShortcutText" Text="F10 to start" VerticalAlignment="Center" FontSize="11" Foreground="{DynamicResource PilotMuted}" />
+          </Grid>
+        </StackPanel>
+      </Border>
+    </Grid>
+    <ContentControl x:Name="SettingsHost" Grid.Row="2" Grid.RowSpan="2" Visibility="Collapsed" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+      <ContentControl.RenderTransform>
+        <TranslateTransform x:Name="SettingsSlide" />
+      </ContentControl.RenderTransform>
+    </ContentControl>
+  </Grid>
+</ui:FluentWindow>

@@ -1,0 +1,13 @@
+{
+  "stw-quests-native": "SaveTheWorldLobby",
+  "world-map-stonewood-native": "WorldMap",
+  "stonewood-missions-native": "MissionMap",
+  "homebase-selected-native": "MissionMap",
+  "homebase-launch-native": "HomebaseChoice",
+  "homebase-ready-native": "HomebaseReady",
+  "mode-stw-selected-native": "ModeSelection",
+  "installation-error-native": "NeedsAttention",
+  "installation-error-ultrawide": "NeedsAttention",
+  "season-xp-claim-native": "RewardClaim",
+  "mode-discovery-stw-native": "ModeDiscovery"
+}

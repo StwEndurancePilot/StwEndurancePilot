@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\EndurancePilot.Core\EndurancePilot.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="OpenCvSharp4.Windows.Slim" Version="4.13.0.20260627" />
+    <PackageReference Include="WPF-UI" Version="4.3.0" />
+  </ItemGroup>
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Version>1.0.1</Version>
+    <Product>Endurance Pilot</Product>
+    <ApplicationIcon>Branding\Pilot.ico</ApplicationIcon>
+    <Description>Save the World endurance runner — early access</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="Branding\Pilot.png" />
+    <Resource Include="Branding\Pilot.ico" />
+    <Content Include="assets\*.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="BundleCompressedRecognitionLibrary" AfterTargets="ComputeResolvedFilesToPublishList" Condition="'$(CompactNativeDirectory)' != ''">
+    <Error Condition="!Exists('$(CompactNativeDirectory)\OpenCvSharpExtern.dll.br') Or !Exists('$(CompactNativeDirectory)\OpenCvSharpExtern.dll.br.sha256')" Text="Compressed recognition library or checksum is missing." />
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Filename)%(Extension)' == 'OpenCvSharpExtern.dll'" />
+      <ResolvedFileToPublish Include="$(CompactNativeDirectory)\OpenCvSharpExtern.dll.br" RelativePath="OpenCvSharpExtern.dll.br" CopyToPublishDirectory="PreserveNewest" />
+      <ResolvedFileToPublish Include="$(CompactNativeDirectory)\OpenCvSharpExtern.dll.br.sha256" RelativePath="OpenCvSharpExtern.dll.br.sha256" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
+</Project>

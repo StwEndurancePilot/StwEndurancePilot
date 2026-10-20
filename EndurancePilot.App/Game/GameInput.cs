@@ -1,0 +1,399 @@
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using EndurancePilot.Core;
+
+namespace EndurancePilot.App;
+
+internal sealed class TargetChangedException() : InvalidOperationException("Detected button changed during recognition. No click or keypress sent.");
+
+internal static class GameInput
+{
+    public static async Task<bool> DispatchAsync(GameWindow game, Bitmap observedImage, ClickAction action,
+        Func<bool> sessionIsCurrent, CancellationToken cancellation)
+    {
+        if (action.Step == NavigationStep.SearchSaveTheWorld && !DiscoveryNavigation.IsSearchAction(action))
+        {
+            throw new InvalidOperationException("Search typing is not allowed on this screen.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        if (now < action.ObservedAt || now - action.ObservedAt > NavigationTiming.MaximumObservationAge(action.Step))
+        {
+            throw new GameObservationChangedException("Detection expired before input. Reacquiring the screen.");
+        }
+
+        if (observedImage.Width != action.FrameWidth || observedImage.Height != action.FrameHeight
+            || !AutomationController.IsValidTarget(action.Target, action.FrameWidth, action.FrameHeight))
+        {
+            throw new InvalidOperationException("Detection does not belong to this image.");
+        }
+
+        ValidateWindow(game, action);
+        if ((GetAsyncKeyState(1) & 0x8000) != 0 || (GetAsyncKeyState(2) & 0x8000) != 0)
+        {
+            throw new UserInteractionException("Mouse is in use. No input sent.");
+        }
+
+        using var currentImage = game.Capture();
+
+        if (QuestMenuEntry.IsFallback(action))
+        {
+            var bars = HealthBarDetector.Find(currentImage);
+            if (bars.Count != 1 || bars[0].Bounds.IntersectionOverUnion(action.Target) <= .6)
+            {
+                throw new TargetChangedException();
+            }
+        }
+        if (!QuestMenuEntry.IsFallback(action) && !TargetStillMatches(observedImage, currentImage, action.Target))
+        {
+            throw new TargetChangedException();
+        }
+
+        var point = new NativePoint
+        {
+            X = game.ClientBounds.Left + (int)Math.Round(action.Target.CenterX),
+            Y = game.ClientBounds.Top + (int)Math.Round(action.Target.CenterY)
+        };
+        ValidateWindow(game, action);
+        if (GetAncestor(WindowFromPoint(point), 2) != game.Handle)
+        {
+            throw new UserInteractionException("Another window covers the target. No input sent.");
+        }
+
+        if (action.Key is { } key)
+        {
+            if (!InteractionPrompts.IsAllowedKeyboardAction(action))
+            {
+                throw new InvalidOperationException("Keyboard action is not allowed for this screen.");
+            }
+
+            ushort virtualKey = key switch
+            {
+                NavigationKey.C => 0x43,
+                NavigationKey.E => 0x45,
+                NavigationKey.Tab => 0x09,
+                NavigationKey.Escape => 0x1B,
+                _ => throw new InvalidOperationException("Unsupported key")
+            };
+            foreach (int heldKey in new[] { (int)virtualKey, 0x10, 0x11, 0x12, 0x41, 0x57, 0x53, 0x44 })
+            {
+                if ((GetAsyncKeyState(heldKey) & 0x8000) != 0)
+                {
+                    throw new UserInteractionException("Keyboard is in use. No input sent.");
+                }
+            }
+
+            ValidateWindow(game, action);
+            cancellation.ThrowIfCancellationRequested();
+            if (!sessionIsCurrent())
+            {
+                return false;
+            }
+
+            NativeInput down = new()
+            {
+                Type = 1,
+                Data = new()
+                {
+                    Keyboard = new()
+                    {
+                        VirtualKey = virtualKey
+                    }
+                }
+            };
+            NativeInput up = new()
+            {
+                Type = 1,
+                Data = new()
+                {
+                    Keyboard = new()
+                    {
+                        VirtualKey = virtualKey,
+                        Flags = 2
+                    }
+                }
+            };
+            return await KeyPress.SendAsync(
+                () => { if (SendInput(1, [down], Marshal.SizeOf<NativeInput>()) != 1) { throw new InvalidOperationException("Windows did not accept key down. Recovery paused."); } },
+                () =>
+                {
+                    if (SendInput(1, [up], Marshal.SizeOf<NativeInput>()) != 1 && SendInput(1, [up], Marshal.SizeOf<NativeInput>()) != 1)
+                    {
+                        throw new InvalidOperationException("Windows did not accept key release. Recovery paused.");
+                    }
+                },
+                () => sessionIsCurrent() && game.IsForeground, cancellation);
+        }
+
+        int desktopX = GetSystemMetrics(76), desktopY = GetSystemMetrics(77);
+        int desktopWidth = GetSystemMetrics(78), desktopHeight = GetSystemMetrics(79);
+        if (desktopWidth <= 1 || desktopHeight <= 1)
+        {
+            throw new InvalidOperationException("Desktop geometry unavailable.");
+        }
+
+        NativeInput move = new()
+        {
+            Data = new()
+            {
+                Mouse = new()
+                {
+                    X = (int)Math.Round((point.X - desktopX) * 65535d / (desktopWidth - 1)),
+                    Y = (int)Math.Round((point.Y - desktopY) * 65535d / (desktopHeight - 1)),
+                    Flags = 0x0001 | 0x8000 | 0x4000
+                }
+            }
+        };
+        if (SendInput(1, [move], Marshal.SizeOf<NativeInput>()) != 1)
+        {
+            throw new Win32Exception(Marshal.GetLastWin32Error());
+        }
+
+        await Task.Delay(NavigationTiming.HoverSettleMilliseconds(action.Step), cancellation);
+        if (!sessionIsCurrent())
+        {
+            return false;
+        }
+
+        ValidateWindow(game, action);
+        if (!GetCursorPos(out var settled) || Math.Abs(settled.X - point.X) > 2 || Math.Abs(settled.Y - point.Y) > 2)
+        {
+            throw new UserInteractionException("Pointer moved during settling. Reacquiring the target; no click sent.");
+        }
+
+        if (GetAncestor(WindowFromPoint(point), 2) != game.Handle
+            || (GetAsyncKeyState(1) & 0x8000) != 0 || (GetAsyncKeyState(2) & 0x8000) != 0)
+        {
+            throw new UserInteractionException("Target became covered or mouse is in use. No click sent.");
+        }
+
+        if (action.Step == NavigationStep.SelectHomebase)
+        {
+            using var settledImage = game.Capture();
+            if (settledImage.Size != currentImage.Size || !new VisualRecognizer().HomebaseTargetStillPresent(settledImage, action.Target))
+            {
+                throw new TargetChangedException();
+            }
+        }
+        if (!sessionIsCurrent())
+        {
+            return false;
+        }
+
+        ValidateWindow(game, action);
+        if (!GetCursorPos(out var finalPointer) || Math.Abs(finalPointer.X - point.X) > 2 || Math.Abs(finalPointer.Y - point.Y) > 2
+            || GetAncestor(WindowFromPoint(point), 2) != game.Handle
+            || (GetAsyncKeyState(1) & 0x8000) != 0 || (GetAsyncKeyState(2) & 0x8000) != 0)
+        {
+            throw new UserInteractionException("Pointer or target changed during verification. Reacquiring the target; no click sent.");
+        }
+
+        NativeInput[] inputs =
+        [
+            new() { Data = new() { Mouse = new() { Flags = 0x0002 } } },
+            new() { Data = new() { Mouse = new() { Flags = 0x0004 } } }
+        ];
+        uint inserted = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<NativeInput>());
+        if (inserted == 1)
+        {
+            SendInput(1, [new() { Data = new() { Mouse = new() { Flags = 0x0004 } } }], Marshal.SizeOf<NativeInput>());
+        }
+
+        if (inserted != inputs.Length)
+        {
+            throw new InvalidOperationException("Windows did not accept the complete click. Recovery paused.");
+        }
+
+        if (action.Step == NavigationStep.SearchSaveTheWorld)
+        {
+            if (!DiscoveryNavigation.IsSearchAction(action))
+            {
+                throw new InvalidOperationException("Search typing is not allowed on this screen.");
+            }
+
+            await Task.Delay(100, cancellation);
+            if (!sessionIsCurrent())
+            {
+                return false;
+            }
+
+            ValidateWindow(game, action);
+            foreach (int held in new[] { 0x10, 0x11, 0x12, 0x41, 0x0D })
+            {
+                if ((GetAsyncKeyState(held) & 0x8000) != 0)
+                {
+                    throw new UserInteractionException("Keyboard is in use. Search typing cancelled.");
+                }
+            }
+
+            SendKeyboard([Key(0x11), Key(0x41), Key(0x41, 2), Key(0x11, 2)]);
+            foreach (char character in DiscoveryNavigation.Query)
+            {
+                cancellation.ThrowIfCancellationRequested();
+                if (!sessionIsCurrent())
+                {
+                    return false;
+                }
+
+                ValidateWindow(game, action);
+                SendKeyboard([Unicode(character, 4), Unicode(character, 6)]);
+                await Task.Delay(8, cancellation);
+            }
+            if (!sessionIsCurrent())
+            {
+                return false;
+            }
+
+            ValidateWindow(game, action);
+            SendKeyboard([Key(0x0D), Key(0x0D, 2)]);
+        }
+        return true;
+    }
+
+    private static NativeInput Key(ushort key, uint flags = 0) => new() { Type = 1, Data = new() { Keyboard = new() { VirtualKey = key, Flags = flags } } };
+    private static NativeInput Unicode(char value, uint flags) => new() { Type = 1, Data = new() { Keyboard = new() { Scan = value, Flags = flags } } };
+    private static void SendKeyboard(NativeInput[] inputs)
+    {
+        if (SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<NativeInput>()) == inputs.Length)
+        {
+            return;
+        }
+
+        var releases = inputs.Where(i => (i.Data.Keyboard.Flags & 2) != 0).ToArray();
+        SendInput((uint)releases.Length, releases, Marshal.SizeOf<NativeInput>());
+        throw new InvalidOperationException("Windows rejected search input. Recovery paused.");
+    }
+
+    private static void ValidateWindow(GameWindow game, ClickAction action)
+    {
+        var current = GameWindow.Find();
+        if (current != game || !game.IsForeground || game.ClientBounds.Width != action.FrameWidth
+            || game.ClientBounds.Height != action.FrameHeight)
+        {
+            throw new GameObservationChangedException("Game focus or window layout changed. No click or keypress sent.");
+        }
+    }
+
+    internal static bool ClearClickedControl(GameWindow game, ClickAction action, Box? destination, Func<bool> sessionIsCurrent)
+    {
+
+        if (action.Step is not (NavigationStep.SelectHomebase or NavigationStep.ChangeZone or NavigationStep.DisableAssistance) || destination is not { } target
+                    || !sessionIsCurrent() || !AutomationController.IsValidTarget(target, action.FrameWidth, action.FrameHeight))
+        {
+            return false;
+        }
+
+        if (NavigationPlanner.PointerRestingPoint(target, action.FrameWidth, action.FrameHeight) is not { } resting)
+        {
+            return false;
+        }
+
+        ValidateWindow(game, action);
+        int oldX = game.ClientBounds.Left + (int)Math.Round(action.Target.CenterX);
+        int oldY = game.ClientBounds.Top + (int)Math.Round(action.Target.CenterY);
+        if (!GetCursorPos(out var cursor) || Math.Abs(cursor.X - oldX) > 2 || Math.Abs(cursor.Y - oldY) > 2
+            || (GetAsyncKeyState(1) & 0x8000) != 0 || (GetAsyncKeyState(2) & 0x8000) != 0)
+        {
+            return false;
+        }
+
+        var point = new NativePoint
+        {
+            X = game.ClientBounds.Left + (int)Math.Round(resting.CenterX),
+            Y = game.ClientBounds.Top + (int)Math.Round(resting.CenterY)
+        };
+        if (GetAncestor(WindowFromPoint(point), 2) != game.Handle)
+        {
+            return false;
+        }
+
+        int desktopX = GetSystemMetrics(76), desktopY = GetSystemMetrics(77);
+        int width = GetSystemMetrics(78), height = GetSystemMetrics(79);
+        if (width <= 1 || height <= 1 || !sessionIsCurrent())
+        {
+            return false;
+        }
+
+        NativeInput move = new()
+        {
+            Data = new()
+            {
+                Mouse = new()
+                {
+                    X = (int)Math.Round((point.X - desktopX) * 65535d / (width - 1)),
+                    Y = (int)Math.Round((point.Y - desktopY) * 65535d / (height - 1)),
+                    Flags = 0x0001 | 0x8000 | 0x4000
+                }
+            }
+        };
+        return SendInput(1, [move], Marshal.SizeOf<NativeInput>()) == 1;
+    }
+
+    internal static bool TargetStillMatches(Bitmap before, Bitmap after, Box target)
+    {
+        if (before.Size != after.Size || !AutomationController.IsValidTarget(target, before.Width, before.Height))
+        {
+            return false;
+        }
+
+        var bounds = Rectangle.Intersect(new Rectangle(0, 0, before.Width, before.Height),
+            Rectangle.FromLTRB((int)target.X - 3, (int)target.Y - 3, (int)Math.Ceiling(target.Right) + 3, (int)Math.Ceiling(target.Bottom) + 3));
+        double difference = 0;
+        int changed = 0, samples = 0;
+        for (int y = bounds.Top; y < bounds.Bottom; y += 2)
+        {
+            for (int x = bounds.Left; x < bounds.Right; x += 2)
+            {
+                var a = before.GetPixel(x, y);
+                var b = after.GetPixel(x, y);
+                double delta = (Math.Abs(a.R - b.R) + Math.Abs(a.G - b.G) + Math.Abs(a.B - b.B)) / 3d;
+                difference += delta;
+                if (delta > 40)
+                {
+                    changed++;
+                }
+
+                samples++;
+            }
+        }
+
+        return samples > 0 && difference / samples <= 14 && changed / (double)samples <= .15;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint
+    {
+        public int X, Y;
+    }
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeInput
+    {
+        public uint Type; public NativeUnion Data;
+    }
+    [StructLayout(LayoutKind.Explicit)]
+    private struct NativeUnion
+    {
+        [FieldOffset(0)] public NativeMouse Mouse;
+        [FieldOffset(0)] public NativeKeyboard Keyboard;
+    }
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeKeyboard
+    {
+        public ushort VirtualKey, Scan;
+        public uint Flags, Time;
+        public nuint ExtraInfo;
+    }
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeMouse
+    {
+        public int X, Y;
+        public uint Data, Flags, Time;
+        public nuint ExtraInfo;
+    }
+    [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int key);
+    [DllImport("user32.dll")] private static extern nint WindowFromPoint(NativePoint point);
+    [DllImport("user32.dll")] private static extern nint GetAncestor(nint window, uint flags);
+    [DllImport("user32.dll")] private static extern bool GetCursorPos(out NativePoint point);
+    [DllImport("user32.dll")] private static extern int GetSystemMetrics(int index);
+    [DllImport("user32.dll", SetLastError = true)] private static extern uint SendInput(uint count, NativeInput[] inputs, int size);
+}

@@ -1,0 +1,122 @@
+[
+  {
+    "url": "https://pennydb.plingindigo.org/images/resources/survivor_xp.png",
+    "file": "reward-survivor_xp.png",
+    "sha256": "A6E082A69F29730D974D992E8D0EAF181CAC044214C1458ED70A20543016330A"
+  },
+  {
+    "url": "https://pennydb.plingindigo.org/images/resources/hero_xp.png",
+    "file": "reward-hero_xp.png",
+    "sha256": "C1279CAD46163A5C432BCA0032ADA306CA73301F4FFEB98C5D2BE679810134FD"
+  },
+  {
+    "url": "https://pennydb.plingindigo.org/images/resources/schematic_xp.png",
+    "file": "reward-schematic_xp.png",
+    "sha256": "9672A5234ADC2D2BD9E7F5BF19719BF4074AEBE19DCA89E0F46ACFC78A7D21D6"
+  },
+  {
+    "url": "https://pennydb.plingindigo.org/images/resources/gold.png",
+    "file": "reward-gold.png",
+    "sha256": "8D7061FD27668E481D9D80E25FE06E058B6A246CBE02B9FA5B42A392AC2F48E7"
+  },
+  {
+    "url": "https://pennydb.plingindigo.org/images/resources/legendary_perk-up!.png",
+    "file": "reward-legendary_perk-up.png",
+    "sha256": "0D2F832A74E543E3919AC6D3E19219D08A0503321EFD114C8F22CC88A12E7B9D"
+  },
+  {
+    "url": "https://pennydb.plingindigo.org/images/resources/epic_perk-up!.png",
+    "file": "reward-epic_perk-up.png",
+    "sha256": "F033A493C617EA684BA4166F70CDE7E8A665AA2432C5E619DBCC9806B56A4B9B"
+  },
+  {
+    "url": "https://pennydb.plingindigo.org/images/resources/rare_perk-up!.png",
+    "file": "reward-rare_perk-up.png",
+    "sha256": "DC872A2ECCC5AFC01E31CBF70AEF7B0DD13D98FCF0435CD070305FB4DF8B4EA0"
+  },
+  {
+    "url": "https://pennydb.plingindigo.org/images/resources/uncommon_perk-up!.png",
+    "file": "reward-uncommon_perk-up.png",
+    "sha256": "B796733A6421235516C045FBB9230B0AFF7979629CFBD590482B76B8B88B22C5"
+  },
+  {
+    "url": "https://pennydb.plingindigo.org/images/resources/re-perk!.png",
+    "file": "reward-re-perk.png",
+    "sha256": "B51B1F556B57D24D2367ED8163B1CD71E6E3CFF23BCABCAA5DB94B75729C8171"
+  },
+  {
+    "url": "https://pennydb.plingindigo.org/images/resources/fire-up!.png",
+    "file": "reward-fire-up.png",
+    "sha256": "F8DE59AFF8E32526A435665CCEBA51FF43CFB81F91D7C2E15AEF95E97F86AEE3"
+  },
+  {
+    "url": "https://pennydb.plingindigo.org/images/resources/amp-up!.png",
+    "file": "reward-amp-up.png",
+    "sha256": "AE9E79B5868BCA3F58446CAEC25FB4B1BB5C2EA322A7EE82439A10BD5A4843A2"
+  },
+  {
+    "url": "https://pennydb.plingindigo.org/images/resources/frost-up!.png",
+    "file": "reward-frost-up.png",
+    "sha256": "EC8BD7AF9733EC880BBC3DDBE31DD4DAF0254C559D7EDDC9F957FC3B0D508A82"
+  },
+  {
+    "url": "https://pennydb.plingindigo.org/images/resources/pure_drop_of_rain.png",
+    "file": "reward-pure_drop_of_rain.png",
+    "sha256": "30B65E413018F3E01E973ECAB21305854305DFB4E0F505B868574BD6BCC760F8"
+  },
+  {
+    "url": "https://pennydb.plingindigo.org/images/resources/lightning_in_a_bottle.png",
+    "file": "reward-lightning_in_a_bottle.png",
+    "sha256": "83611275840ECFDE1F54C3750740B643F40091BAB1CEB2C92FB843DFC6DF2305"
+  },
+  {
+    "url": "https://pennydb.plingindigo.org/images/resources/eye_of_the_storm.png",
+    "file": "reward-eye_of_the_storm.png",
+    "sha256": "B8E98013AB87FEA82EACBECE464E68A062FD2E708B9C2561BDDF712CACBDA8D6"
+  },
+  {
+    "url": "https://pennydb.plingindigo.org/images/resources/storm_shard.png",
+    "file": "reward-storm_shard.png",
+    "sha256": "BADB3C519308EFD8BB27C78C9AD2D8403CDEFF933A41D7A8249868EEDB9745E2"
+  },
+  {
+    "url": "https://pennydb.plingindigo.org/images/resources/training_manual.png",
+    "file": "reward-training_manual.png",
+    "sha256": "69842E611D1A8368E0577CD812F8C4BA50B8E6194804B305091DC6FD71E0F7ED"
+  },
+  {
+    "url": "https://pennydb.plingindigo.org/images/resources/trap_designs.png",
+    "file": "reward-trap_designs.png",
+    "sha256": "2D0960887D4FE73A63776C1FE1CA6E7AB73B8BC0DE8A08FBE8E053C102305A9D"
+  },
+  {
+    "url": "https://pennydb.plingindigo.org/images/resources/weapon_designs.png",
+    "file": "reward-weapon_designs.png",
+    "sha256": "2943D3226B53BED86BD75B474E149A6905B60AD048E679681889F524644E58F7"
+  },
+  {
+    "url": "https://pennydb.plingindigo.org/images/resources/mini_reward_llama.png",
+    "file": "reward-mini_reward_llama.png",
+    "sha256": "D8117C00747EE8F2CBFC125C053DECE480374A5545B53AC819819FB8D493219C"
+  },
+  {
+    "url": "https://pennydb.plingindigo.org/images/resources/x-ray_tickets.png",
+    "file": "reward-x-ray_tickets.png",
+    "sha256": "72817813B219EFBD82425069D4F2DF61F9A62C811798D9026EBFE217D72C6A55"
+  },
+  {
+    "url": "https://pennydb.plingindigo.org/images/resources/v-bucks_voucher.png",
+    "file": "reward-v-bucks_voucher.png",
+    "sha256": "EDDCC65F0E73A357FE5FB49C2FF5EEE1F251DDC277B06EA3D165E0138B7D1D42"
+  },
+  {
+    "url": "https://pennydb.plingindigo.org/images/resources/road_trip_tickets.png",
+    "file": "reward-road_trip_tickets.png",
+    "sha256": "A3FA21DF15F4411D559FF3FCEB0633C63FD31EDEB950111D329008DC79C0D73B"
+  },
+  {
+    "url": "https://gamewave.fr/static/images/medias/upload/Florian/Fornite/xp.png",
+    "file": "reward-season_xp.png",
+    "sha256": "141B6571A8E4D0218F239015EDCBE1B1197AA59673C39EBA9FB3A530CFFC4398"
+  }
+]

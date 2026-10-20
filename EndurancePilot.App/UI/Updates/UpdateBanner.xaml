@@ -1,0 +1,20 @@
+<UserControl x:Class="EndurancePilot.App.UpdateBanner" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml" Foreground="{DynamicResource PilotText}" FontFamily="Segoe UI Variable, Segoe UI" AutomationProperties.LiveSetting="Polite">
+  <Border CornerRadius="12" BorderThickness="1" BorderBrush="{DynamicResource PilotBorder}" Background="{DynamicResource PilotSurface}">
+    <Grid>
+      <Border CornerRadius="11" Background="{DynamicResource PilotAccent}" Opacity="0.07" IsHitTestVisible="False" />
+      <Grid Margin="14,12">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <ui:SymbolIcon Symbol="ArrowDownload24" FontSize="20" Foreground="{DynamicResource PilotAccent}" VerticalAlignment="Center" />
+        <StackPanel Grid.Column="1" Margin="12,0">
+          <TextBlock Text="Update available" FontSize="13" FontWeight="SemiBold" />
+          <TextBlock x:Name="VersionText" FontSize="11" Margin="0,3,0,0" Foreground="{DynamicResource PilotSecondary}" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+        <ui:Button x:Name="DownloadButton" Grid.Column="2" Appearance="Primary" CornerRadius="8" Padding="12,8" FontSize="12" Background="{DynamicResource PilotAccent}" Foreground="{DynamicResource PilotOnAccent}" MouseOverBackground="{DynamicResource PilotAccentHover}" PressedBackground="{DynamicResource PilotAccentPressed}" PressedForeground="{DynamicResource PilotOnAccent}" VerticalAlignment="Center" Content="Download" Click="DownloadClicked" AutomationProperties.Name="Download available update" />
+      </Grid>
+    </Grid>
+  </Border>
+</UserControl>
