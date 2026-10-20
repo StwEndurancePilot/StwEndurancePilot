@@ -18,13 +18,13 @@ public enum NavigationKey
 }
 public sealed record RunnerProfile(HomebaseZone Zone = HomebaseZone.Unspecified, bool AfkBaseConfirmed = false, int TargetWave = 30,
     bool EndRunWhenTargetReached = true);
-public sealed record NavigationPlan(NavigationStep Step, string Description, Box Target, string? Context = null, NavigationKey? Key = null, int KeyPressCount = 1, int KeyPressIntervalMs = 0);
+public sealed record NavigationPlan(NavigationStep Step, string Description, Box Target, string? Context = null, NavigationKey? Key = null, int KeyPressCount = 1, int KeyPressIntervalMs = 0, NavigationKey? FinalKey = null);
 public sealed record NavigationDecision(NavigationPlan? Plan, string Detail, bool RequiresAttention = false);
 
 public static class NavigationPlanner
 {
 
-    private static readonly TimeSpan RewardReadDuration = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan RewardReadDuration = TimeSpan.FromSeconds(30);
     private static readonly object RewardStateLock = new();
     private static DateTimeOffset? rewardReadStartedAt;
     private static bool rewardSequenceIssued;
@@ -44,13 +44,13 @@ public static class NavigationPlanner
 
             if (rewardSequenceIssued)
             {
-                return new(null, "Reward Space sequence already requested");
+                return new(null, "Reward Space and C sequence already requested");
             }
 
             rewardSequenceIssued = true;
             var plan = new NavigationPlan(NavigationStep.CollectMissionRewards,
-                "Press Space three times to collect rewards", default,
-                Key: NavigationKey.Space, KeyPressCount: 3, KeyPressIntervalMs: 100);
+                "Press Space three times, then C to collect rewards", default,
+                Key: NavigationKey.Space, KeyPressCount: 3, KeyPressIntervalMs: 100, FinalKey: NavigationKey.C);
             return new(plan, plan.Description);
         }
     }
