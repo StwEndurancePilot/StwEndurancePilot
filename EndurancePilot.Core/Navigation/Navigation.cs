@@ -14,15 +14,74 @@ public enum NavigationStep
 }
 public enum NavigationKey
 {
-    E, Tab, Escape, C
+    E, Tab, Escape, C, Space
 }
 public sealed record RunnerProfile(HomebaseZone Zone = HomebaseZone.Unspecified, bool AfkBaseConfirmed = false, int TargetWave = 30,
     bool EndRunWhenTargetReached = true);
-public sealed record NavigationPlan(NavigationStep Step, string Description, Box Target, string? Context = null, NavigationKey? Key = null);
+public sealed record NavigationPlan(NavigationStep Step, string Description, Box Target, string? Context = null, NavigationKey? Key = null, int KeyPressCount = 1, int KeyPressIntervalMs = 0);
 public sealed record NavigationDecision(NavigationPlan? Plan, string Detail, bool RequiresAttention = false);
 
 public static class NavigationPlanner
 {
+
+    private static readonly TimeSpan RewardReadDuration = TimeSpan.FromSeconds(60);
+    private static readonly object RewardStateLock = new();
+    private static DateTimeOffset? rewardReadStartedAt;
+    private static bool rewardSequenceIssued;
+    private static readonly TimeSpan MatchmakeDelay = TimeSpan.FromSeconds(10);
+    private static DateTimeOffset? matchmakeFirstSeenAt;
+
+    private static NavigationDecision RewardSequence(Observation frame)
+    {
+        lock (RewardStateLock)
+        {
+            rewardReadStartedAt ??= frame.CapturedAt;
+            var elapsed = frame.CapturedAt - rewardReadStartedAt.Value;
+            if (elapsed < RewardReadDuration)
+            {
+                return new(null, $"Reading mission rewards ({Math.Max(0, (int)Math.Ceiling((RewardReadDuration - elapsed).TotalSeconds))}s remaining)");
+            }
+
+            if (rewardSequenceIssued)
+            {
+                return new(null, "Reward Space sequence already requested");
+            }
+
+            rewardSequenceIssued = true;
+            var plan = new NavigationPlan(NavigationStep.CollectMissionRewards,
+                "Press Space three times to collect rewards", default,
+                Key: NavigationKey.Space, KeyPressCount: 3, KeyPressIntervalMs: 100);
+            return new(plan, plan.Description);
+        }
+    }
+
+    private static void ClearRewardSequence()
+    {
+        lock (RewardStateLock)
+        {
+            rewardReadStartedAt = null;
+            rewardSequenceIssued = false;
+        }
+    }
+
+    private static NavigationDecision WaitForMatchmake(Observation frame, TextRegion[] controls)
+    {
+        lock (RewardStateLock)
+        {
+            matchmakeFirstSeenAt ??= frame.CapturedAt;
+            var elapsed = frame.CapturedAt - matchmakeFirstSeenAt.Value;
+            if (elapsed < MatchmakeDelay)
+            {
+                var remaining = Math.Max(0, (int)Math.Ceiling((MatchmakeDelay - elapsed).TotalSeconds));
+                return new(null, $"Waiting before matchmaking into Homebase ({remaining}s remaining)");
+            }
+        }
+
+        var target = AutomationController.UniqueTarget(controls);
+        return target is { } box
+            ? new(new(NavigationStep.ReturnToHomebase, "Press C to matchmake into Homebase", box, Key: NavigationKey.C), "Return to Homebase")
+            : new(null, "Waiting for an unambiguous Matchmake into Homebase control");
+    }
 
     public const string MissionLaunchLabel = @"^LAUNC(?:H|N|II)$";
     public static NavigationDecision Decide(Observation frame, ScreenEvidence screen, RunnerProfile profile, bool homebaseClickConfirmed = false)
@@ -30,6 +89,20 @@ public static class NavigationPlanner
         if (!screen.AllowsInput)
         {
             return new(null, string.Join("; ", screen.Reasons));
+        }
+
+        if (screen.Kind is not (ScreenKind.Rewards or ScreenKind.RewardClaim))
+        {
+            ClearRewardSequence();
+        }
+
+        if (screen.Kind is not (ScreenKind.Victory or ScreenKind.Defeat) ||
+            !frame.Has(@"^(?:C )?MATCHMAKE INTO HOMEBASE$"))
+        {
+            lock (RewardStateLock)
+            {
+                matchmakeFirstSeenAt = null;
+            }
         }
 
         NavigationDecision Text(NavigationStep step, string description, IEnumerable<TextRegion> regions, string? context = null, NavigationKey? key = null)
@@ -71,41 +144,21 @@ public static class NavigationPlanner
 
         if (screen.Kind == ScreenKind.RewardClaim)
         {
-            var claim = RewardClaimTarget(frame);
-            return claim is { } box ? new(new(NavigationStep.ClaimReward, "Claim Save the World Season XP", box), "Claim earned reward")
-                : new(null, "Waiting for one unambiguous Claim control");
+            return RewardSequence(frame);
         }
         if (screen.Kind is ScreenKind.Victory or ScreenKind.Defeat)
         {
             var home = frame.Find(@"^(?:C )?MATCHMAKE INTO HOMEBASE$").ToArray();
             if (home.Length > 0)
             {
-                return Text(NavigationStep.ReturnToHomebase, "Press C to matchmake into Homebase", home, key: NavigationKey.C);
+                return WaitForMatchmake(frame, home);
             }
 
             return Text(NavigationStep.ContinueResults, "Continue from the mission result", frame.Find(@"^CONTINUE$"));
         }
         if (screen.Kind == ScreenKind.Rewards)
         {
-            foreach (var label in new[] { "OPEN", "COLLECT ALL", "CLAIM", "COLLECT", "CONTINUE" })
-            {
-                if (MissionRewardControls(frame).Any(region => region.Normalized == label))
-                {
-                    var decision = Text(NavigationStep.CollectMissionRewards,
-                        label == "OPEN" ? "Open mission rewards" : "Collect earned mission rewards",
-                        MissionRewardControls(frame).Where(region => region.Normalized == label));
-                    return decision.Plan is { } plan
-                        ? decision with
-                        {
-                            Plan = plan with
-                            {
-                                Context = MissionRewardReader.PageContext(frame, screen)
-                            }
-                        }
-                        : decision;
-                }
-            }
-            return new(null, "Waiting for an unambiguous reward collection control");
+            return RewardSequence(frame);
         }
         if (profile.Zone == HomebaseZone.Unspecified)
         {
