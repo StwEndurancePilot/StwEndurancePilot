@@ -197,6 +197,27 @@ internal static class WebhookChecks
                 await notifier.Send(errorMessage);
                 Check("Disabling errors also prevents screenshot delivery", handler.Calls == 2);
             }
+            var attentionMessage = errorMessage with
+            {
+                Event = WebhookEvent.Stuck,
+                Title = "Runner needs attention",
+                Description = "Cannot select Storm Shield Endurance: this menu shows Expand Storm Shield instead."
+            };
+            using (var content = DiscordNotifier.Content(attentionMessage))
+            {
+                var parts = (content as MultipartFormDataContent)?.ToArray();
+                using var json = JsonDocument.Parse(await parts![0].ReadAsStringAsync());
+                Check("Attention webhook attaches its captured Storm Shield screenshot",
+                    parts.Length == 2 && parts[1].Headers.ContentDisposition?.FileName?.Trim('"') == "fortnite-attention.jpg"
+                    && (await parts[1].ReadAsByteArrayAsync()).SequenceEqual(screenshot!)
+                    && json.RootElement.GetProperty("embeds")[0].GetProperty("description").GetString() == attentionMessage.Description
+                    && json.RootElement.GetProperty("embeds")[0].GetProperty("image").GetProperty("url").GetString() == "attachment://fortnite-attention.jpg");
+            }
+            using (var sampleContent = DiscordNotifier.Content(attentionMessage with { IsTest = true }))
+            {
+                Check("Attention samples do not attach a live game screenshot",
+                    sampleContent.Headers.ContentType?.MediaType == "application/json");
+            }
             foreach (var plain in new[] { message with { Screenshot = screenshot }, errorMessage with { IsTest = true }, errorMessage with { Screenshot = null }, errorMessage with { Screenshot = new byte[NotificationScreenshot.MaxBytes + 1] } })
             {
                 using var content = DiscordNotifier.Content(plain);
@@ -319,9 +340,18 @@ internal static class WebhookChecks
             events.Clear();
             monitor.Error(2);
             monitor.Error(2);
-            monitor.Attention(true, 2);
+            monitor.Attention(true, 2, "Cannot select Storm Shield Endurance: this menu shows Expand Storm Shield instead.");
             monitor.Attention(true, 2);
             Check("Persistent error and attention each alert once", events.Count(e => e == WebhookEvent.Error) == 1 && events.Count(e => e == WebhookEvent.Stuck) == 1);
+            var attentionDetails = new List<string>();
+            var detailedMonitor = new RunNotifications((kind, _, detail, _) =>
+            {
+                if (kind == WebhookEvent.Stuck) attentionDetails.Add(detail);
+            });
+            detailedMonitor.Attention(true, null, "Cannot select Storm Shield Endurance: this menu shows Expand Storm Shield instead.");
+            detailedMonitor.Attention(true, null, "Second observation");
+            Check("Storm Shield attention reports the actual failure once",
+                attentionDetails.Count == 1 && attentionDetails[0].Contains("Expand Storm Shield", StringComparison.Ordinal));
             monitor.Crash();
             monitor.Crash();
             monitor.Launched();

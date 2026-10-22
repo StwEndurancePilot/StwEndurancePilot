@@ -134,6 +134,48 @@ internal static class DiscoveryChecks
             }
         }
 
+        var newLobbyCases = new (string Name, ScreenKind Kind, NavigationStep Step, Box Target)[]
+        {
+            ("new-featured-lobby", ScreenKind.FeaturedLobby, NavigationStep.GoToLobby, new(1325, 832, 210, 45)),
+            ("new-stw-selected-lobby", ScreenKind.ModeSelection, NavigationStep.EnterSaveTheWorld, new(67, 727, 286, 66)),
+            ("new-discover-search", ScreenKind.DiscoverBrowser, NavigationStep.SearchSaveTheWorld, new(67, 133, 1466, 60)),
+            ("new-discover-results", ScreenKind.DiscoverResults, NavigationStep.SelectSaveTheWorld, new(322, 387, 240, 134)),
+            ("new-stw-details", ScreenKind.SaveTheWorldDetails, NavigationStep.ConfirmSaveTheWorld, new(67, 738, 266, 54))
+        };
+        foreach (var test in newLobbyCases)
+        {
+            using var source = new Bitmap(Path.Combine(captures, test.Name + ".png"));
+            foreach (var (width, height) in new[] { (1280, 720), (1600, 900), (1920, 1200), (3440, 1440) })
+            {
+                using var bitmap = new Bitmap(width, height);
+                double scale = Math.Min((double)width / source.Width, (double)height / source.Height);
+                float x = (float)(width - source.Width * scale) / 2, y = (float)(height - source.Height * scale) / 2;
+                using (var graphics = Graphics.FromImage(bitmap))
+                {
+                    graphics.Clear(Color.Black);
+                    graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                    graphics.DrawImage(source, x, y, (float)(source.Width * scale), (float)(source.Height * scale));
+                }
+                var frame = await ocr.ReadAsync(bitmap);
+                var screen = recognizer.Recognize(frame);
+                frame = visual.Enrich(bitmap, frame, screen.Kind);
+                screen = recognizer.Recognize(frame);
+                var plan = NavigationPlanner.Decide(frame, screen, new(HomebaseZone.TwinePeaks, true)).Plan;
+                var box = new Box(x + test.Target.X * scale, y + test.Target.Y * scale,
+                    test.Target.Width * scale, test.Target.Height * scale);
+                bool passed = screen.Kind == test.Kind && plan?.Step == test.Step
+                    && plan.Target.CenterX >= box.X && plan.Target.CenterX <= box.Right
+                    && plan.Target.CenterY >= box.Y && plan.Target.CenterY <= box.Bottom;
+                if (!passed)
+                {
+                    failures++;
+                    await File.WriteAllTextAsync(Path.Combine(output, $"{test.Name}-{width}x{height}.json"),
+                        JsonSerializer.Serialize(new { Observation = frame, Screen = screen, Plan = plan }, Inspection.Json));
+                }
+                reports.Add(new { Name = $"{test.Name}-{width}x{height}", Passed = passed, screen.Kind, plan });
+            }
+        }
+
         await File.WriteAllTextAsync(Path.Combine(output, "results.json"), JsonSerializer.Serialize(new
         {
             Checks = reports.Count,

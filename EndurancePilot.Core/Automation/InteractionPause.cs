@@ -20,7 +20,7 @@ public sealed class InteractionPause
         idleSince = null;
         pointer = null;
     }
-    public bool Ready(DateTimeOffset now, bool focused, bool held, int x, int y, bool resumeHub = false)
+    public bool Ready(DateTimeOffset now, bool focused, bool held, int x, int y, bool resumeHub = false, int backgroundIdleSeconds = 10)
     {
         if (!Active)
         {
@@ -35,7 +35,7 @@ public sealed class InteractionPause
             return false;
         }
         idleSince ??= now;
-        if (now - idleSince < TimeSpan.FromSeconds(focused ? 2 : 10))
+        if (now - idleSince < TimeSpan.FromSeconds(focused ? 2 : backgroundIdleSeconds))
         {
             return false;
         }

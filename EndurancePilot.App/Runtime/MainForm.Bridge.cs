@@ -45,7 +45,16 @@ public sealed partial class MainForm
     }
 
     internal RunnerSettings ReadSettings() => new((HomebaseZone)zone.SelectedItem!, (int)runLimit.Value,
-        launchIfMissing.Checked, indefinite.Checked, manualThemeEnabled, manualDarkTheme, targetWave, webhook, endRunWhenTargetReached, waitForAssistance);
+        launchIfMissing.Checked, indefinite.Checked, manualThemeEnabled, manualDarkTheme, targetWave, webhook,
+        endRunWhenTargetReached, waitForAssistance, autoResumeFortnite, autoResumeIdleSeconds);
+    internal void SetAutoResume(bool enabled, int idleSeconds)
+    {
+        var next = ReadSettings() with { AutoResumeFortnite = enabled, AutoResumeIdleSeconds = idleSeconds };
+        next.Validate();
+        settingsStore.Save(next);
+        autoResumeFortnite = enabled;
+        autoResumeIdleSeconds = idleSeconds;
+    }
     internal void ApplySettings(RunnerSettings value)
     {
         if (runner.IsRunning)
@@ -68,6 +77,8 @@ public sealed partial class MainForm
         targetWave = value.TargetWave;
         endRunWhenTargetReached = value.EndRunWhenTargetReached;
         waitForAssistance = value.WaitForAssistance;
+        autoResumeFortnite = value.AutoResumeFortnite;
+        autoResumeIdleSeconds = value.AutoResumeIdleSeconds;
         ConfigureWebhook(value.Webhook!);
     }
     internal void ApplyAppearance(bool manual, bool dark)
@@ -104,7 +115,9 @@ public sealed partial class MainForm
         if (InputPaused && !attention)
         {
             heading = "Paused for your input";
-            detail = "Focus Fortnite and leave input idle for 2 seconds, or click Resume.";
+            detail = autoResumeFortnite
+                ? $"Fortnite resumes after {autoResumeIdleSeconds} seconds without keyboard or mouse input, or click Resume."
+                : "Focus Fortnite and leave input idle for 2 seconds, or click Resume.";
         }
         if (runner.IsRunning && status.Text.StartsWith("Observation paused"))
         {

@@ -42,7 +42,7 @@ public sealed partial class MainForm
             return;
         }
 
-        var screenshot = kind is (WebhookEvent.Error or WebhookEvent.WaveReached) && webhook.Enabled && webhook.Events.HasFlag(kind)
+        var screenshot = kind is (WebhookEvent.Error or WebhookEvent.Stuck or WebhookEvent.WaveReached) && webhook.Enabled && webhook.Events.HasFlag(kind)
             && notificationFrame is { } frame ? NotificationScreenshot.Encode(frame) : null;
         _ = notifier.Send(new(kind, title, description, controller.Profile.Zone.ToString(), controller.Profile.TargetWave, wave, Screenshot: screenshot));
     }

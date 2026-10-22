@@ -11,7 +11,7 @@ public static class MenuGeometry
         NavigationStep.OpenMap or NavigationStep.ChangeZone or NavigationStep.EnterZone
         or NavigationStep.SelectHomebase or NavigationStep.OpenHomebase or NavigationStep.SelectOwnHomebase
         or NavigationStep.LaunchHomebase or NavigationStep.LaunchLoadedHomebase
-        or NavigationStep.SelectStormShieldTab or NavigationStep.SelectEndurance
+        or NavigationStep.SelectStormShieldTab or NavigationStep.SelectEndurance or NavigationStep.SelectStormShieldExpansion
         or NavigationStep.DisableAssistance or NavigationStep.EnableAssistance or NavigationStep.StartEndurance;
 
     public static Box Target(NavigationStep step, Observation frame, bool forward = true)
@@ -28,7 +28,7 @@ public static class MenuGeometry
             NavigationStep.LaunchHomebase => (.56, .86, .09, .04, HorizontalAnchor.Center),
             NavigationStep.LaunchLoadedHomebase => (.82, .80, .12, .07, HorizontalAnchor.Right),
             NavigationStep.SelectStormShieldTab => (.31, .02, .09, .035, HorizontalAnchor.Center),
-            NavigationStep.SelectEndurance => (.24, .46, .12, .16, HorizontalAnchor.Center),
+            NavigationStep.SelectEndurance or NavigationStep.SelectStormShieldExpansion => (.24, .46, .12, .16, HorizontalAnchor.Center),
             NavigationStep.DisableAssistance or NavigationStep.EnableAssistance => (.44, .59, .02, .045, HorizontalAnchor.Center),
             NavigationStep.StartEndurance => (.43, .70, .14, .04, HorizontalAnchor.Center),
             _ => throw new ArgumentOutOfRangeException(nameof(step))

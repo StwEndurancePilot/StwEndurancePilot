@@ -62,9 +62,20 @@ internal static class NavigationScenarios
         var expansionDecision = NavigationPlanner.Decide(expansionMenu, expansionEvidence, profile);
         check("Expand Storm Shield is recognized as the console, not the backpack",
             expansionEvidence.Kind == ScreenKind.StormShieldConsole);
-        check("Expansion menu requires attention instead of launching a different mission",
-            expansionDecision.RequiresAttention && expansionDecision.Plan is null
-            && expansionDecision.Detail.Contains("Endurance is unavailable", StringComparison.Ordinal));
+        check("Expand Storm Shield gets its own click action",
+            !expansionDecision.RequiresAttention
+            && expansionDecision.Plan is { Step: NavigationStep.SelectStormShieldExpansion, Key: null } expansionPlan
+            && expansionPlan.Target == MenuGeometry.Target(NavigationStep.SelectStormShieldExpansion, expansionMenu)
+            && expansionPlan.Target.CenterX is > 329 and < 622
+            && expansionPlan.Target.CenterY is > 270 and < 688);
+        var expandAction = new ClickAction(Guid.NewGuid(), "Select Expand Storm Shield", ScreenKind.StormShieldConsole,
+            expansionDecision.Plan!.Target, expansionMenu.Width, expansionMenu.Height, epoch,
+            Step: NavigationStep.SelectStormShieldExpansion);
+        check("Expansion click waits for the menu to change",
+            !NavigationPlanner.IsSatisfied(expandAction, expansionMenu, expansionEvidence));
+        check("Expansion click confirms a different Storm Shield screen",
+            NavigationPlanner.IsSatisfied(expandAction, expansionMenu,
+                new(ScreenKind.EnduranceSetup, ["Start control visible"], [])));
         var assistanceSetup = Frame(0, Label("STORM SHIELD", 300, 130), Label("START ENDURANCE", 700, 700));
         var uncheckedSetup = assistanceSetup with { Visuals = [new("assistance-unchecked", new(1127, 824, 57, 56), .95, .2)] };
         var checkedSetup = assistanceSetup with { Visuals = [new("assistance-checked", new(1127, 824, 57, 56), .95, .2)] };

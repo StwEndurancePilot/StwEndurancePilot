@@ -131,8 +131,8 @@ Check("Recovery cooldown prevents immediate input", Feed(6, "NETWORK CONNECTION 
 controller.Start();
 action = PlanError(10, installation: true);
 controller.Dispatched(action, epoch.AddSeconds(11));
-Feed(12, "SAVE THE WORLD", "COMPETE", "CAREER");
-Feed(13, "SAVE THE WORLD", "COMPETE", "CAREER");
+Feed(12, "MAP", "COMMAND", "ARMORY");
+Feed(13, "MAP", "COMMAND", "ARMORY");
 Check("Installation error pauses after verified dismissal", controller.Status == ControllerStatus.PausedForAttention);
 Check("Paused controller cannot act", Feed(15, "NETWORK CONNECTION LOST", "CONTINUE") is null);
 

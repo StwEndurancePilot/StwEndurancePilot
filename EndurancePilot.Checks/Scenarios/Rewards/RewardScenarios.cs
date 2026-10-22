@@ -96,6 +96,38 @@ internal static class RewardScenarios
             CapturedAt = epoch.AddSeconds(4)
         }, resultEvidence);
         check("Stable Matchmake control confirms score-animation Continue without a timeout", scoreController.Pending is null);
+        var renamedResult = result with
+        {
+            Regions = result.Regions.Select(r => r.Text == "DEFEAT" ? r with { Text = "VICTORY" } : r).ToArray()
+        };
+        var renamedEvidence = recognizer.Recognize(renamedResult);
+        check("Defeat score animation can lead to Victory-labelled Matchmake",
+            renamedEvidence.Kind == ScreenKind.Victory
+            && NavigationPlanner.IsSatisfied(scoreContinue, renamedResult, renamedEvidence));
+        var overlappingResult = renamedResult with
+        {
+            Regions = renamedResult.Regions.Append(new TextRegion("CONTINUE", new(1488, 864, 82, 16))).ToArray()
+        };
+        check("Visible Matchmake takes priority while Continue text lingers",
+            NavigationPlanner.IsSatisfied(scoreContinue, overlappingResult, recognizer.Recognize(overlappingResult)));
+        var changedLabelController = new AutomationController { ClaimRewards = true };
+        changedLabelController.Start();
+        changedLabelController.Observe(scoreAnimation, recognizer.Recognize(scoreAnimation));
+        var changedLabelContinue = changedLabelController.Observe(scoreAnimation with
+        {
+            CapturedAt = epoch.AddSeconds(1)
+        }, recognizer.Recognize(scoreAnimation))!;
+        changedLabelController.Dispatched(changedLabelContinue, epoch.AddSeconds(1));
+        changedLabelController.Observe(renamedResult with { CapturedAt = epoch.AddSeconds(2) }, renamedEvidence);
+        changedLabelController.Observe(renamedResult with { CapturedAt = epoch.AddSeconds(3) }, renamedEvidence);
+        check("Renamed result confirms Continue instead of pausing", changedLabelController.Pending is null
+            && changedLabelController.Status == ControllerStatus.Observing);
+        ClickAction? changedLabelReturn = null;
+        for (int second = 4; second <= 12 && changedLabelReturn is null; second++)
+        {
+            changedLabelReturn = changedLabelController.Observe(renamedResult with { CapturedAt = epoch.AddSeconds(second) }, renamedEvidence);
+        }
+        check("Renamed result proceeds to C for Homebase", changedLabelReturn is { Step: NavigationStep.ReturnToHomebase, Key: NavigationKey.C });
         check("Observed result offers return-homebase without Continue", NavigationPlanner.Decide(result, resultEvidence, new()).Plan?.Step == NavigationStep.ReturnToHomebase);
         var duplicates = result with
         {

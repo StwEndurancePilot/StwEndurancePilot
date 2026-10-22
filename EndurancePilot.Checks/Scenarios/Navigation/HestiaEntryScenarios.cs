@@ -26,6 +26,9 @@ internal static class HestiaEntryScenarios
         check("Background hub waits ten seconds", !pause.Ready(epoch.AddSeconds(9), false, false, 0, 0, resumeHub: true));
         check("Confirmed background hub can resume after inactivity", pause.Ready(epoch.AddSeconds(10), false, false, 0, 0, resumeHub: true));
         pause.Begin();
+        check("OS-confirmed idle resumes without a second countdown", pause.Ready(epoch.AddSeconds(10), false, false, 0, 0,
+            resumeHub: true, backgroundIdleSeconds: 0));
+        pause.Begin();
         pause.Ready(epoch, false, false, 0, 0, resumeHub: true);
         check("User activity postpones hub focus recovery", !pause.Ready(epoch.AddSeconds(10), false, true, 0, 0, resumeHub: true));
         pause.Ready(epoch.AddSeconds(11), false, false, 0, 0, resumeHub: true);

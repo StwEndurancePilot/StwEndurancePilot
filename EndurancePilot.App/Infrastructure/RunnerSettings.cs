@@ -6,7 +6,8 @@ namespace EndurancePilot.App;
 internal sealed record RunnerSettings(HomebaseZone Zone = HomebaseZone.TwinePeaks, int AttemptLimit = 1,
     bool LaunchIfMissing = true, bool RunIndefinitely = true,
     bool ManualThemeEnabled = false, bool ManualDarkTheme = true, int TargetWave = 30,
-    WebhookSettings? Webhook = null, bool EndRunWhenTargetReached = true, bool WaitForAssistance = false)
+    WebhookSettings? Webhook = null, bool EndRunWhenTargetReached = true, bool WaitForAssistance = false,
+    bool AutoResumeFortnite = true, int AutoResumeIdleSeconds = 10)
 {
     public void Validate()
     {
@@ -19,6 +20,10 @@ internal sealed record RunnerSettings(HomebaseZone Zone = HomebaseZone.TwinePeak
         if (TargetWave is < 1 or > 30)
         {
             throw new InvalidDataException("Choose a target wave from 1 to 30.");
+        }
+        if (AutoResumeIdleSeconds is < 2 or > 600)
+        {
+            throw new InvalidDataException("Choose an auto resume delay from 2 to 600 seconds.");
         }
     }
 }

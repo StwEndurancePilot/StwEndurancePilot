@@ -39,6 +39,8 @@ public partial class PilotWindow : FluentWindow
             .Select(z => new { Zone = z, Label = z switch { HomebaseZone.TwinePeaks => "Twine Peaks", HomebaseZone.CannyValley => "Canny Valley", _ => z.ToString() } }).ToArray();
         ZoneChoice.SelectedValue = settings.Zone;
         AttemptInput.Value = settings.AttemptLimit;
+        AutoResumeToggle.IsChecked = settings.AutoResumeFortnite;
+        AutoResumeSecondsInput.Value = settings.AutoResumeIdleSeconds;
         for (int i = 0; i < 30; i++)
         {
             WaveSegments.Children.Add(new Border { CornerRadius = new CornerRadius(2), Margin = new Thickness(0, 0, i == 29 ? 0 : 4, 0) });
@@ -69,6 +71,37 @@ public partial class PilotWindow : FluentWindow
         Closed += (_, _) => { refresh.Stop(); host.ShutdownBridge(); activityWindow?.Close(); };
         ZoneChoice.SelectionChanged += (_, _) => SaveOptions();
         AttemptInput.ValueChanged += (_, _) => SaveOptions();
+        AutoResumeToggle.Checked += (_, _) => SaveAutoResume();
+        AutoResumeToggle.Unchecked += (_, _) => SaveAutoResume();
+        AutoResumeSecondsInput.ValueChanged += (_, _) => SaveAutoResume();
+        AutoResumeSecondsInput.LostKeyboardFocus += (_, _) =>
+        {
+            if (AutoResumeSecondsInput.Value is null)
+            {
+                AutoResumeSecondsInput.Value = host.ReadSettings().AutoResumeIdleSeconds;
+            }
+        };
+    }
+
+    private void SaveAutoResume()
+    {
+        if (!loaded || AutoResumeSecondsInput.Value is not { } seconds || !double.IsFinite(seconds)
+            || seconds != Math.Truncate(seconds) || seconds is < 2 or > 600)
+        {
+            return;
+        }
+
+        try
+        {
+            host.SetAutoResume(AutoResumeToggle.IsChecked == true, (int)seconds);
+            settingsError = null;
+            RefreshState();
+        }
+        catch (Exception error)
+        {
+            settingsError = error.Message;
+            StatusDetail.Text = error.Message;
+        }
     }
 
     private bool SaveOptions()
@@ -172,6 +205,7 @@ public partial class PilotWindow : FluentWindow
             : indefinite ? "No attempt limit. Stop whenever you’re ready." : "Stop automatically at your attempt limit.";
         PrimaryText.Text = s.Running ? "Stop runner" : "Start endurance";
         ResumeButton.Visibility = host.InputPaused && !s.Attention ? Visibility.Visible : Visibility.Collapsed;
+        AutoResumeSecondsInput.IsEnabled = AutoResumeToggle.IsChecked == true;
         ShortcutText.Text = s.Running ? "F10 to stop" : "F10 to start";
         PrimaryIcon.Symbol = s.Running ? SymbolRegular.Stop24 : SymbolRegular.Play24;
         ApplyPrimaryButtonPalette(s.Running);

@@ -15,6 +15,7 @@ internal static class SettingsChecks
             Check("Default target is wave 30", store.Load(out warning).TargetWave == 30);
             Check("End at target defaults on", store.Load(out warning).EndRunWhenTargetReached);
             Check("Wait for assistance defaults off", !store.Load(out warning).WaitForAssistance);
+            Check("Auto resume defaults to ten idle seconds", store.Load(out warning) is { AutoResumeFortnite: true, AutoResumeIdleSeconds: 10 });
             var saved = new RunnerSettings(EndurancePilot.Core.HomebaseZone.CannyValley, 3, false, false);
             store.Save(saved);
             Check("Preferences survive a new store instance", new SettingsStore(path).Load(out warning) == saved && warning is null);
@@ -59,10 +60,16 @@ internal static class SettingsChecks
             saved = saved with { WaitForAssistance = true };
             store.Save(saved);
             Check("Wait for assistance survives restart", new SettingsStore(path).Load(out warning) == saved && warning is null);
+            saved = saved with { AutoResumeFortnite = false, AutoResumeIdleSeconds = 23 };
+            store.Save(saved);
+            Check("Auto resume toggle and delay survive restart", new SettingsStore(path).Load(out warning) == saved && warning is null);
             var priorContext = SynchronizationContext.Current;
             var host = new MainForm(store);
             try
             {
+                host.SetAutoResume(true, 17);
+                Check("Auto resume changes without restarting the host", host.ReadSettings() is { AutoResumeFortnite: true, AutoResumeIdleSeconds: 17 }
+                    && store.Load(out warning).AutoResumeIdleSeconds == 17);
                 var firstSetup = new WebhookSettings(Enabled: true);
                 host.ApplyWebhook(firstSetup);
                 Check("First setup can enable before saving a webhook URL",
@@ -113,6 +120,7 @@ internal static class SettingsChecks
             Check("Existing settings default to target wave 30", legacy.TargetWave == 30);
             Check("Existing settings retain automatic target exit", legacy.EndRunWhenTargetReached);
             Check("Existing settings retain solo Endurance", !legacy.WaitForAssistance);
+            Check("Existing settings receive the auto resume defaults", legacy is { AutoResumeFortnite: true, AutoResumeIdleSeconds: 10 });
             File.WriteAllText(path, "{\"Zone\":\"TwinePeaks\",\"AttemptLimit\":2,\"AfkBaseReady\":false,\"LaunchIfMissing\":true}");
             Check("Removed AFK preference does not invalidate existing settings", store.Load(out warning) == legacy && warning is null);
             File.WriteAllText(path, "broken json");

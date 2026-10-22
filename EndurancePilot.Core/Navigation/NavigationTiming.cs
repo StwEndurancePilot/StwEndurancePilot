@@ -21,9 +21,9 @@ public static class NavigationTiming
     public static bool IsFastStep(NavigationStep? step) => step is NavigationStep.EnterSaveTheWorld or NavigationStep.OpenMap
         or NavigationStep.ChangeZone or NavigationStep.EnterZone or NavigationStep.SelectHomebase or NavigationStep.OpenHomebase
         or NavigationStep.SelectOwnHomebase or NavigationStep.LaunchHomebase or NavigationStep.LaunchLoadedHomebase
-        or NavigationStep.SelectEndurance or NavigationStep.DisableAssistance or NavigationStep.EnableAssistance or NavigationStep.SelectSaveTheWorld
+        or NavigationStep.SelectEndurance or NavigationStep.SelectStormShieldExpansion or NavigationStep.DisableAssistance or NavigationStep.EnableAssistance or NavigationStep.SelectSaveTheWorld
         or NavigationStep.OpenQuestMenu or NavigationStep.OpenStormShieldConsole or NavigationStep.OpenBackpack or NavigationStep.SelectStormShieldTab
-        or NavigationStep.OpenDiscover or NavigationStep.FilterByEpic or NavigationStep.SearchSaveTheWorld or NavigationStep.ConfirmSaveTheWorld;
+        or NavigationStep.OpenDiscover or NavigationStep.GoToLobby or NavigationStep.FilterByEpic or NavigationStep.SearchSaveTheWorld or NavigationStep.ConfirmSaveTheWorld;
 
     public static TimeSpan Stability(NavigationStep? step, ScreenEvidence evidence) => IsFastStep(step) && !evidence.UsesFuzzyMatching
         ? TimeSpan.FromMilliseconds(100) : TimeSpan.FromMilliseconds(500);
@@ -36,7 +36,7 @@ public static class NavigationTiming
     public static int PollMilliseconds(ScreenKind screen, NavigationStep? pending) => screen is ScreenKind.Rewards or ScreenKind.RewardClaim ? 50
         : screen == ScreenKind.Loading && pending is null ? 250 : IsMenuStep(pending)
         || screen is ScreenKind.ModeDiscovery or ScreenKind.ModeSelection or ScreenKind.SaveTheWorldHub
-            or ScreenKind.FortniteLobby or ScreenKind.DiscoverBrowser or ScreenKind.DiscoverResults or ScreenKind.SaveTheWorldDetails
+            or ScreenKind.FortniteLobby or ScreenKind.FeaturedLobby or ScreenKind.DiscoverBrowser or ScreenKind.DiscoverResults or ScreenKind.SaveTheWorldDetails
             or ScreenKind.SaveTheWorldLobby or ScreenKind.WorldMap or ScreenKind.MissionMap
             or ScreenKind.HomebaseChoice or ScreenKind.HomebasePreparing or ScreenKind.HomebaseReady
             or ScreenKind.Matchmaking or ScreenKind.Homebase or ScreenKind.Backpack

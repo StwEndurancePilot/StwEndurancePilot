@@ -7,10 +7,10 @@ public enum HomebaseZone
 public enum NavigationStep
 {
     EnterSaveTheWorld, OpenMap, ChangeZone, EnterZone, SelectHomebase, OpenHomebase,
-    SelectOwnHomebase, LaunchHomebase, LaunchLoadedHomebase, StartEndurance, ClaimReward, SelectEndurance, DisableAssistance, EnableAssistance,
+    SelectOwnHomebase, LaunchHomebase, LaunchLoadedHomebase, StartEndurance, ClaimReward, SelectEndurance, SelectStormShieldExpansion, DisableAssistance, EnableAssistance,
     SelectSaveTheWorld, OpenQuestMenu, OpenStormShieldConsole, ContinueResults, CollectMissionRewards, OpenBackpack, SelectStormShieldTab, AbandonRejoin, KeepPlaying, ReturnToHomebase,
     OpenTargetExitBackpack, BackToStormShield, LeaveTargetMission, ConfirmTargetLeave,
-    OpenDiscover, FilterByEpic, SearchSaveTheWorld, ConfirmSaveTheWorld, RetryQuestMenu, SkipFeedback, ContinueUnlock
+    OpenDiscover, GoToLobby, FilterByEpic, SearchSaveTheWorld, ConfirmSaveTheWorld, RetryQuestMenu, SkipFeedback, ContinueUnlock
 }
 public enum NavigationKey
 {
@@ -139,6 +139,7 @@ public static class NavigationPlanner
         switch (screen.Kind)
         {
             case ScreenKind.FortniteLobby:
+            case ScreenKind.FeaturedLobby:
             case ScreenKind.DiscoverBrowser:
             case ScreenKind.DiscoverResults:
             case ScreenKind.SaveTheWorldDetails:
@@ -253,7 +254,8 @@ public static class NavigationPlanner
                 }
                 if (StormShieldNavigation.ExpandTile(frame) is not null)
                 {
-                    return new(null, "Endurance is unavailable here: the Storm Shield menu offers Expand Storm Shield. Check whether Storm Shield Defense 10 has been completed in this zone.", true);
+                    return new(new(NavigationStep.SelectStormShieldExpansion, "Select Expand Storm Shield",
+                        MenuGeometry.Target(NavigationStep.SelectStormShieldExpansion, frame)), "Select Expand Storm Shield");
                 }
                 return new(null, "Waiting for an unambiguous endurance tile");
             case ScreenKind.EnduranceSetup:
@@ -498,6 +500,7 @@ public static class NavigationPlanner
 
     public static bool IsSatisfied(ClickAction action, Observation frame, ScreenEvidence screen) => action.Step switch
     {
+        NavigationStep.GoToLobby => screen.Kind is ScreenKind.FortniteLobby or ScreenKind.ModeSelection or ScreenKind.ModeDiscovery,
         NavigationStep.OpenDiscover => DiscoveryNavigation.IsBrowser(screen.Kind) || action.SourceScreen == ScreenKind.FortniteLobby && screen.Kind == ScreenKind.ModeDiscovery,
         NavigationStep.FilterByEpic => DiscoveryNavigation.IsBrowser(screen.Kind) && ReliableVisual(frame, "by-epic-selected") is not null,
         NavigationStep.SearchSaveTheWorld => screen.Kind == ScreenKind.DiscoverResults && DiscoveryNavigation.HasQuery(frame),
@@ -516,8 +519,8 @@ public static class NavigationPlanner
         NavigationStep.ContinueResults => screen.Kind is ScreenKind.Rewards or ScreenKind.RewardClaim or ScreenKind.Loading
             or ScreenKind.SaveTheWorldHub or ScreenKind.SaveTheWorldLobby or ScreenKind.ModeDiscovery or ScreenKind.ModeSelection
             || DiscoveryNavigation.IsOutOfMission(screen.Kind)
-            || screen.Kind == action.SourceScreen && screen.Kind is ScreenKind.Victory or ScreenKind.Defeat
-                && !frame.Has(@"^CONTINUE$")
+            || action.SourceScreen is (ScreenKind.Victory or ScreenKind.Defeat)
+                && screen.Kind is (ScreenKind.Victory or ScreenKind.Defeat)
                 && AutomationController.UniqueTarget(frame.Find(@"^(?:C )?MATCHMAKE INTO HOMEBASE$").ToArray()) is not null,
         NavigationStep.ReturnToHomebase => screen.Kind is ScreenKind.Matchmaking or ScreenKind.Rewards or ScreenKind.RewardClaim or ScreenKind.Loading
             or ScreenKind.SaveTheWorldHub or ScreenKind.SaveTheWorldLobby
@@ -546,6 +549,7 @@ public static class NavigationPlanner
         NavigationStep.LaunchLoadedHomebase => screen.Kind is ScreenKind.Loading or ScreenKind.Homebase,
         NavigationStep.StartEndurance => screen.Kind is ScreenKind.ActiveEndurance or ScreenKind.EnduranceCountdown,
         NavigationStep.SelectEndurance => screen.Kind == ScreenKind.EnduranceSetup,
+        NavigationStep.SelectStormShieldExpansion => screen.AllowsInput && screen.Kind is not (ScreenKind.Unknown or ScreenKind.StormShieldConsole),
         NavigationStep.DisableAssistance => screen.Kind == ScreenKind.EnduranceSetup
             && ReliableVisual(frame, "assistance-unchecked") is not null && ReliableVisual(frame, "assistance-checked") is null,
         NavigationStep.EnableAssistance => screen.Kind == ScreenKind.EnduranceSetup

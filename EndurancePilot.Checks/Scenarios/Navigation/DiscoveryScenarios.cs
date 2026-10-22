@@ -48,8 +48,10 @@ internal static class DiscoveryScenarios
             Label("About Island",1500,200),Label("By Epic",1400,420),Label("SELECT",190,900)]);
         check("Epic details must be selected before Play", Plan(details)?.Step == NavigationStep.ConfirmSaveTheWorld);
         check("A different creator cannot be selected", Plan(details with { Regions = details.Regions.Select(r => r.Text == "Created by Epic" ? r with { Text = "Created by Someone" } : r).ToArray() }) is null);
-        var lobby = new Observation(epoch, 1920, 1080, [Label("PLAY", 80, 50), Label("SHOP", 200, 50), Label("LOCKER", 300, 50), Label("COMPETE", 690, 50), Label("CAREER", 840, 50), Label("BATTLE ROYALE", 80, 740, 300), Label("PLAY", 180, 900)]);
-        check("Different mode is recognised without pressing its Play", recognizer.Recognize(lobby).Kind == ScreenKind.FortniteLobby && Plan(lobby) is null);
+        var lobby = new Observation(epoch, 1920, 1080, [Label("PLAV", 189, 50, 54, 14), Label("SHOP", 274, 50, 56, 14),
+            Label("LOCKER", 363, 50, 78, 14), Label("COMPETE", 694, 50, 96, 14), Label("CAREER", 822, 50, 80, 14),
+            Label("BATTLE ROYALE", 80, 740, 300), Label("PLAY", 180, 900)]);
+        check("Different mode is recognised without pressing its Play", recognizer.Recognize(lobby).Kind == ScreenKind.FortniteLobby && Plan(lobby)?.Step == NavigationStep.OpenDiscover);
         check("Lobby tolerates unreadable Career with four ordered tabs", recognizer.Recognize(lobby with
         {
             Regions = lobby.Regions.Where(r => r.Text != "CAREER").ToArray()
@@ -60,13 +62,13 @@ internal static class DiscoveryScenarios
         }));
         check("Unaligned labels cannot establish lobby navigation", !DiscoveryNavigation.HasLobbyNavigation(lobby with
         {
-            Regions = lobby.Regions.Select(r => r.Text == "LOCKER" ? r with { Bounds = new(300, 500, 100, 30) } : r).ToArray()
+            Regions = lobby.Regions.Select(r => r.Text == "LOCKER" ? r with { Bounds = new(363, 500, 78, 14) } : r).ToArray()
         }));
         lobby = lobby with
         {
             Visuals = [new("discover-chevron", new(970, 1040, 45, 28), .99, .2)]
         };
-        check("Different mode opens detected bottom chevron", Plan(lobby)?.Step == NavigationStep.OpenDiscover);
+        check("Different mode opens the search icon", Plan(lobby)?.Step == NavigationStep.OpenDiscover);
         var visibleTile = lobby with
         {
             Visuals = [.. lobby.Visuals!, new("stw-discovery-tile", new(80, 950, 180, 100), .94, .2)]
@@ -77,7 +79,7 @@ internal static class DiscoveryScenarios
             Regions = visibleTile.Regions.Append(Label("SAVE THE WORLD", 80, 950, 180)).ToArray()
         };
         check("Tile text cannot cause entry without a Play button beneath it", Plan(tileText)?.Step == NavigationStep.SelectSaveTheWorld);
-        check("Ambiguous carousel artwork falls back to the chevron", Plan(visibleTile with
+        check("Ambiguous carousel artwork falls back to search", Plan(visibleTile with
         {
             Visuals = [lobby.Visuals![0], visibleTile.Visuals![1] with { Margin = .01 }]
         })?.Step == NavigationStep.OpenDiscover);
@@ -127,6 +129,32 @@ internal static class DiscoveryScenarios
         {
             Regions = stw.Regions.Where(r => r.Text != "CAREER").ToArray()
         })?.Step == NavigationStep.EnterSaveTheWorld);
+        var featured = lobby with
+        {
+            Regions = lobby.Regions.Append(Label("GO TO LOBBY", 1400, 1000, 150)).ToArray(),
+            Visuals = [new("stw-discovery-tile", new(70, 900, 280, 120), .99, .3)]
+        };
+        check("Featured page uses Go to Lobby before its carousel tile", recognizer.Recognize(featured).Kind == ScreenKind.FeaturedLobby
+            && Plan(featured)?.Step == NavigationStep.GoToLobby);
+        var searchLobby = new Observation(epoch, 1600, 900, [Label("PLAV", 189, 50, 54, 14),
+            Label("SHOP", 274, 50, 56, 14), Label("LOCKER", 363, 50, 78, 14),
+            Label("QUESTS", 584, 50, 78, 17), Label("BATTLE ROYALE", 80, 625, 275, 20),
+            Label("PLAY", 178, 750, 78, 20)]);
+        check("Different mode opens top-left search", Plan(searchLobby) is { Step: NavigationStep.OpenDiscover, Target: { } searchTarget }
+            && searchTarget.CenterX is > 70 and < 120 && searchTarget.CenterY is > 35 and < 90);
+        var newSearch = new Observation(epoch, 1600, 900, [Label("PLAV", 189, 50, 54, 14), Label("SHOP", 274, 50, 56, 14),
+            Label("LOCKER", 363, 50, 78, 14), Label("QUESTS", 584, 50, 78, 17),
+            Label("Search Discover...", 82, 151, 197, 25), Label("Featured By Epic", 58, 247, 186, 20)]);
+        check("New Discover page searches without the old Epic filter", recognizer.Recognize(newSearch).Kind == ScreenKind.DiscoverBrowser
+            && Plan(newSearch)?.Step == NavigationStep.SearchSaveTheWorld);
+        var newResults = newSearch with { Regions = newSearch.Regions.Where(r => r.Text is not ("Search Discover..." or "Featured By Epic"))
+            .Append(Label("Save The World", 82, 155, 173, 16)).Append(Label("ISLANDS (100)", 93, 257, 143, 17))
+            .Append(Label("Islands Results", 58, 334, 169, 16)).ToArray(),
+            Visuals = [new("stw-search-tile", new(322, 387, 240, 134), .99, .3)] };
+        check("New results select the official matching tile", recognizer.Recognize(newResults).Kind == ScreenKind.DiscoverResults
+            && Plan(newResults)?.Step == NavigationStep.SelectSaveTheWorld);
+        check("Wrong new search query is replaced", Plan(newResults with { Regions = newResults.Regions.Select(r => r.Text == "Save The World"
+            ? r with { Text = "Battle Royale" } : r).ToArray() })?.Step == NavigationStep.SearchSaveTheWorld);
         (Observation Frame, NavigationStep Step)[] route = [(lobby,NavigationStep.OpenDiscover),(carousel,NavigationStep.OpenDiscover),
             (browser,NavigationStep.FilterByEpic),(selected,NavigationStep.SearchSaveTheWorld),(results,NavigationStep.SelectSaveTheWorld),
             (details,NavigationStep.ConfirmSaveTheWorld),(stw,NavigationStep.EnterSaveTheWorld)];
@@ -145,6 +173,24 @@ internal static class DiscoveryScenarios
                 next = controller.Observe(frame, recognizer.Recognize(frame));
             }
             check("Discovery route dispatches " + leg.Step + " from " + recognizer.Recognize(leg.Frame).Kind, next?.Step == leg.Step);
+            controller.Dispatched(next!, time);
+        }
+        controller.Start();
+        (Observation Frame, NavigationStep Step)[] newRoute = [(featured, NavigationStep.GoToLobby),
+            (searchLobby, NavigationStep.OpenDiscover), (newSearch, NavigationStep.SearchSaveTheWorld),
+            (newResults, NavigationStep.SelectSaveTheWorld), (details, NavigationStep.ConfirmSaveTheWorld),
+            (stw, NavigationStep.EnterSaveTheWorld)];
+        time = epoch.AddSeconds(30);
+        foreach (var leg in newRoute)
+        {
+            ClickAction? next = null;
+            for (int i = 0; i < 20 && next is null; i++)
+            {
+                time = time.AddMilliseconds(150);
+                var frame = leg.Frame with { CapturedAt = time };
+                next = controller.Observe(frame, recognizer.Recognize(frame));
+            }
+            check("New lobby route dispatches " + leg.Step, next?.Step == leg.Step);
             controller.Dispatched(next!, time);
         }
         foreach (var kind in new[] { ScreenKind.FortniteLobby, ScreenKind.DiscoverBrowser, ScreenKind.DiscoverResults, ScreenKind.SaveTheWorldDetails })

@@ -129,6 +129,18 @@
       <Border x:Name="RunControls" Grid.Row="1" Padding="28,16,28,18" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource PilotBorder}" Background="{DynamicResource PilotBackground}">
         <StackPanel>
           <TextBlock x:Name="StatusDetail" Visibility="Collapsed" />
+          <Grid Margin="0,0,0,9">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition />
+              <ColumnDefinition Width="72" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <ui:ToggleSwitch x:Name="AutoResumeToggle" VerticalAlignment="Center" AutomationProperties.Name="Automatically resume in Fortnite" />
+            <TextBlock Grid.Column="1" Text="Auto resume after idle" FontSize="12" VerticalAlignment="Center" Margin="8,0,8,0" />
+            <ui:NumberBox x:Name="AutoResumeSecondsInput" Grid.Column="2" Value="10" Minimum="2" Maximum="600" MaxDecimalPlaces="0" AcceptsExpression="False" Height="32" AutomationProperties.Name="Auto resume idle seconds" />
+            <TextBlock Grid.Column="3" Text="sec" FontSize="12" VerticalAlignment="Center" Margin="6,0,0,0" />
+          </Grid>
           <ui:Button x:Name="ResumeButton" Content="Resume in Fortnite" Visibility="Collapsed" HorizontalAlignment="Stretch" Height="38" Margin="0,0,0,8" Click="ResumeClicked" AutomationProperties.Name="Resume in Fortnite" />
           <ui:Button x:Name="PrimaryButton" Appearance="Primary" CornerRadius="10" Height="54" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Click="PrimaryClicked" AutomationProperties.Name="Start endurance">
             <Grid Margin="6,0">

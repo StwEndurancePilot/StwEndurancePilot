@@ -40,7 +40,7 @@ public enum ScreenKind
     Loading, Homebase, EnduranceSetup, ActiveEndurance, Victory, Defeat, Rewards, ErrorDialog, NeedsAttention,
     RewardClaim, ModeDiscovery, EnduranceCountdown, StormShieldConsole, SaveTheWorldHub, Backpack, EnduranceStatus,
     HomebasePreparing, RejoinDialog, SleepMode, LeaveConfirmation,
-    FortniteLobby, DiscoverBrowser, DiscoverResults, SaveTheWorldDetails, FeedbackSurvey, NewUnlock
+    FortniteLobby, FeaturedLobby, DiscoverBrowser, DiscoverResults, SaveTheWorldDetails, FeedbackSurvey, NewUnlock
 }
 
 public sealed record ScreenEvidence(ScreenKind Kind, IReadOnlyList<string> Reasons, IReadOnlyList<TextRegion> Targets)
@@ -275,7 +275,7 @@ public sealed class ScreenRecognizer
             return Result(ScreenKind.ModeDiscovery, "Mode discovery with current lobby and Save the World category");
         }
 
-        if (NavigationPlanner.SaveTheWorldTitles(frame).Any()
+        if (NavigationPlanner.SaveTheWorldTitles(frame).Any(r => r.Bounds.CenterY > frame.Height * .5)
             && (Has(@"^COMPETE?$") && Has(@"^CAREER$") || DiscoveryNavigation.HasLobbyNavigation(frame)))
         {
             return Result(ScreenKind.ModeSelection, "Main mode navigation with Save the World selected", @"^PLAY$");

@@ -8,9 +8,6 @@ internal sealed class UserInteractionException(string message) : InvalidOperatio
 public sealed partial class MainForm
 {
     private readonly InteractionPause interactionPause = new();
-    private DateTimeOffset confirmedHubAt;
-    private DateTimeOffset confirmedSleepAt;
-    private DateTimeOffset confirmedClaimAt;
     internal bool InputPaused => runner.IsRunning && interactionPause.Active;
     private void WaitForUserInput(string reason)
     {
@@ -22,7 +19,9 @@ public sealed partial class MainForm
         interactionPause.Begin();
         controller.InvalidateObservation();
         timer.Interval = 250;
-        status.Text = "Paused for your input · focus Fortnite and leave input idle for 2 seconds to resume.";
+        status.Text = autoResumeFortnite
+            ? $"Paused for your input · automatically resuming after {autoResumeIdleSeconds} idle seconds."
+            : "Paused for your input · focus Fortnite and leave input idle for 2 seconds to resume.";
         AddActivity(reason);
     }
     internal void ResumeInput()
@@ -56,12 +55,13 @@ public sealed partial class MainForm
 
         var lastInput = new LastInput { Size = (uint)Marshal.SizeOf<LastInput>() };
         if (resumeUnattended && (!GetLastInputInfo(ref lastInput)
-            || unchecked((uint)Environment.TickCount - lastInput.Tick) < 10000))
+            || unchecked((uint)Environment.TickCount - lastInput.Tick) < (uint)autoResumeIdleSeconds * 1000u))
         {
             held = true;
         }
 
-        if (!interactionPause.Ready(DateTimeOffset.UtcNow, game.IsForeground, held || !gotPointer, point.X, point.Y, resumeUnattended))
+        if (!interactionPause.Ready(DateTimeOffset.UtcNow, game.IsForeground, held || !gotPointer, point.X, point.Y,
+            resumeUnattended, resumeUnattended ? 0 : 10))
         {
             timer.Interval = 250;
             return false;

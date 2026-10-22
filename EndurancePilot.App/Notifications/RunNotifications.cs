@@ -129,11 +129,12 @@ internal sealed class RunNotifications(Action<WebhookEvent, string, string, int?
         emit(WebhookEvent.Launch, crash ? "Restarting Fortnite" : "Launching Fortnite", "Waiting for Epic to open the game.", null);
         crash = false;
     }
-    internal void Attention(bool paused, int? wave)
+    internal void Attention(bool paused, int? wave, string? reason = null)
     {
         if (paused && !attention)
         {
-            emit(WebhookEvent.Stuck, "Runner needs attention", "Unable to continue. Check Fortnite.", wave);
+            emit(WebhookEvent.Stuck, "Runner needs attention",
+                string.IsNullOrWhiteSpace(reason) ? "Unable to continue. Check Fortnite." : reason, wave);
         }
 
         attention = paused;

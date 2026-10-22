@@ -216,10 +216,11 @@ internal sealed class DiscordNotifier : IAsyncDisposable
     private static bool HasRewardImage(PilotNotification message) => message.IsRewardReceipt
         && message.RewardImage is { Length: > 0 and <= NotificationScreenshot.MaxBytes };
     private static bool HasImage(PilotNotification message) => HasRewardImage(message)
-        || message.Event is (WebhookEvent.Error or WebhookEvent.WaveReached) && !message.IsTest
+        || message.Event is (WebhookEvent.Error or WebhookEvent.Stuck or WebhookEvent.WaveReached) && !message.IsTest
         && message.Screenshot is { Length: > 0 and <= NotificationScreenshot.MaxBytes };
     private static string ImageFilename(PilotNotification message) => HasRewardImage(message) ? "mission-rewards.png"
-        : message.Event == WebhookEvent.WaveReached ? "fortnite-wave.jpg" : "fortnite-error.jpg";
+        : message.Event == WebhookEvent.WaveReached ? "fortnite-wave.jpg"
+        : message.Event == WebhookEvent.Stuck ? "fortnite-attention.jpg" : "fortnite-error.jpg";
 
     internal static HttpContent Content(PilotNotification message)
     {
@@ -245,7 +246,8 @@ internal sealed class DiscordNotifier : IAsyncDisposable
         },
         attachments = HasImage(message) ? new[]{new {id=0,filename=ImageFilename(message),description=HasRewardImage(message)
             ? message.Description.Replace("**","")[..Math.Min(1024,message.Description.Replace("**","").Length)]
-            : message.Event==WebhookEvent.WaveReached ? "Fortnite wave screen" : "Fortnite error screen"}} : [],
+            : message.Event == WebhookEvent.WaveReached ? "Fortnite wave screen"
+            : message.Event == WebhookEvent.Stuck ? "Fortnite screen requiring attention" : "Fortnite error screen"}} : [],
         embeds = new[] { new {
             title=HasRewardImage(message) ? null : message.Title,
             description=HasRewardImage(message) ? null : string.IsNullOrWhiteSpace(message.Description) ? null : message.Description,

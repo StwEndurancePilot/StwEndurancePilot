@@ -25,6 +25,8 @@ public sealed partial class MainForm : Form
     private int targetWave = 30;
     private bool endRunWhenTargetReached = true;
     private bool waitForAssistance;
+    private bool autoResumeFortnite;
+    private int autoResumeIdleSeconds;
     private readonly NumericUpDown runLimit = new() { Minimum = 1, Maximum = 100, Value = 1, Width = 60 };
     private readonly CheckBox indefinite = new() { Text = "Indefinite", AutoSize = true };
     private SessionProgress runSession => runner.Progress;
@@ -99,6 +101,8 @@ public sealed partial class MainForm : Form
         targetWave = saved.TargetWave;
         endRunWhenTargetReached = saved.EndRunWhenTargetReached;
         waitForAssistance = saved.WaitForAssistance;
+        autoResumeFortnite = saved.AutoResumeFortnite;
+        autoResumeIdleSeconds = saved.AutoResumeIdleSeconds;
         launchIfMissing.Checked = saved.LaunchIfMissing;
         settings.Controls.Add(zone);
         settings.Controls.Add(new Label { Text = "Attempt limit", AutoSize = true, Padding = new Padding(10, 5, 0, 0) });
@@ -308,16 +312,8 @@ public sealed partial class MainForm : Form
                         WaitForUserInput("Waiting for Fortnite focus.");
                     }
 
-                    bool resumeHub = runnerMode && !controller.FinishRewardsOnly && !controller.RunInProgress
-                        && controller.Status is ControllerStatus.Observing or ControllerStatus.AwaitingTransition
-                        && DateTimeOffset.UtcNow - confirmedHubAt < TimeSpan.FromSeconds(30);
-                    bool resumeSleep = runner.IsRunning && runner.Mode != RunnerMode.Observe
-                        && controller.Status is ControllerStatus.Observing or ControllerStatus.AwaitingTransition
-                        && DateTimeOffset.UtcNow - confirmedSleepAt < TimeSpan.FromSeconds(15);
-                    bool resumeClaim = runner.IsRunning && runner.Mode != RunnerMode.Observe
-                        && controller.Status is ControllerStatus.Observing or ControllerStatus.AwaitingTransition
-                        && DateTimeOffset.UtcNow - confirmedClaimAt < TimeSpan.FromSeconds(15);
-                    bool resumeUnattended = resumeHub || resumeSleep || resumeClaim;
+                    bool resumeUnattended = autoResumeFortnite && runner.IsRunning && runner.Mode != RunnerMode.Observe
+                        && controller.Status is ControllerStatus.Observing or ControllerStatus.AwaitingTransition;
                     bool idle = InputReady(game, resumeUnattended);
                     controller.InvalidateObservation();
                     if (idle && resumeUnattended && game.Activate())
@@ -470,7 +466,6 @@ public sealed partial class MainForm : Form
         crashRecovery.Stop();
         pausedByException = false;
         interactionPause.Clear();
-        confirmedClaimAt = default;
         processExits.Reset();
         runner.Start(navigate ? RunnerMode.Runner : recover ? RunnerMode.Recovery : RunnerMode.Observe,
             new(chosen.Zone, true, chosen.TargetWave, chosen.EndRunWhenTargetReached, chosen.WaitForAssistance), chosen.RunIndefinitely ? null : chosen.AttemptLimit, DateTimeOffset.UtcNow);
@@ -574,15 +569,7 @@ public sealed partial class MainForm : Form
             }
 
             evidence = recognizer.Recognize(observation);
-            confirmedHubAt = evidence.Kind == ScreenKind.SaveTheWorldHub && evidence.AllowsInput
-                ? observation.CapturedAt : default;
             observationOnly = game is not null && (observationOnly || !game.IsForeground);
-            confirmedSleepAt = observationOnly && evidence.Kind == ScreenKind.SleepMode && evidence.AllowsInput
-                && NavigationPlanner.Decide(observation, evidence, controller.Profile).Plan is { Step: NavigationStep.KeepPlaying }
-                ? observation.CapturedAt : default;
-            confirmedClaimAt = observationOnly && evidence.Kind == ScreenKind.RewardClaim && evidence.AllowsInput
-                && NavigationPlanner.Decide(observation, evidence, controller.Profile).Plan is { Step: NavigationStep.ClaimReward }
-                ? observation.CapturedAt : default;
             double recognitionMilliseconds = recognitionClock.Elapsed.TotalMilliseconds;
             bool refreshDiagnostics = game is null || evidence.Kind != lastScreen || DateTimeOffset.UtcNow >= nextDiagnostics;
             if (refreshDiagnostics)
@@ -643,7 +630,7 @@ public sealed partial class MainForm : Form
                     });
                 }
 
-                notificationFrame = evidence.Kind is ScreenKind.ErrorDialog or ScreenKind.NeedsAttention or ScreenKind.ActiveEndurance ? image : null;
+                notificationFrame = observationOnly ? null : image;
                 var previousRun = tracker.Current;
                 var entryTimeouts = controller.QuestMenuTimeouts;
                 var update = observationOnly ? runner.ObserveBackground(observation, evidence) : runner.Observe(observation, evidence);
@@ -663,6 +650,11 @@ public sealed partial class MainForm : Form
                 if (notificationSession && evidence.Kind == ScreenKind.NeedsAttention && controller.Status == ControllerStatus.PausedForAttention)
                 {
                     notifications.Error(tracker.Current?.HighestWave);
+                }
+                if (notificationSession && !observationOnly)
+                {
+                    notifications.Attention(controller.Status == ControllerStatus.PausedForAttention,
+                        tracker.Current?.HighestWave, controller.Detail);
                 }
 
                 if (tracker.Current != previousRun && tracker.Current is not null)
