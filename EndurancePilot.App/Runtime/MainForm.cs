@@ -314,7 +314,10 @@ public sealed partial class MainForm : Form
                     bool resumeSleep = runner.IsRunning && runner.Mode != RunnerMode.Observe
                         && controller.Status is ControllerStatus.Observing or ControllerStatus.AwaitingTransition
                         && DateTimeOffset.UtcNow - confirmedSleepAt < TimeSpan.FromSeconds(15);
-                    bool resumeUnattended = resumeHub || resumeSleep;
+                    bool resumeClaim = runner.IsRunning && runner.Mode != RunnerMode.Observe
+                        && controller.Status is ControllerStatus.Observing or ControllerStatus.AwaitingTransition
+                        && DateTimeOffset.UtcNow - confirmedClaimAt < TimeSpan.FromSeconds(15);
+                    bool resumeUnattended = resumeHub || resumeSleep || resumeClaim;
                     bool idle = InputReady(game, resumeUnattended);
                     controller.InvalidateObservation();
                     if (idle && resumeUnattended && game.Activate())
@@ -467,6 +470,7 @@ public sealed partial class MainForm : Form
         crashRecovery.Stop();
         pausedByException = false;
         interactionPause.Clear();
+        confirmedClaimAt = default;
         processExits.Reset();
         runner.Start(navigate ? RunnerMode.Runner : recover ? RunnerMode.Recovery : RunnerMode.Observe,
             new(chosen.Zone, true, chosen.TargetWave, chosen.EndRunWhenTargetReached, chosen.WaitForAssistance), chosen.RunIndefinitely ? null : chosen.AttemptLimit, DateTimeOffset.UtcNow);
@@ -575,6 +579,9 @@ public sealed partial class MainForm : Form
             observationOnly = game is not null && (observationOnly || !game.IsForeground);
             confirmedSleepAt = observationOnly && evidence.Kind == ScreenKind.SleepMode && evidence.AllowsInput
                 && NavigationPlanner.Decide(observation, evidence, controller.Profile).Plan is { Step: NavigationStep.KeepPlaying }
+                ? observation.CapturedAt : default;
+            confirmedClaimAt = observationOnly && evidence.Kind == ScreenKind.RewardClaim && evidence.AllowsInput
+                && NavigationPlanner.Decide(observation, evidence, controller.Profile).Plan is { Step: NavigationStep.ClaimReward }
                 ? observation.CapturedAt : default;
             double recognitionMilliseconds = recognitionClock.Elapsed.TotalMilliseconds;
             bool refreshDiagnostics = game is null || evidence.Kind != lastScreen || DateTimeOffset.UtcNow >= nextDiagnostics;

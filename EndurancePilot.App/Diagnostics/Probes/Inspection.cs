@@ -28,9 +28,22 @@ public static class Inspection
             {
                 Screen = evidence,
                 Observation = observation,
-                Navigation = navigation
+                Navigation = navigation,
+                Rewards = MissionRewardReader.Read(observation, evidence)
             }, Json));
         using var overlay = OcrService.Annotate(bitmap, observation);
         overlay.Save(Path.Combine(outputDirectory, stem + ".overlay.png"), ImageFormat.Png);
+    }
+
+    public static async Task AnalyzeCurrentScreen(string outputDirectory)
+    {
+        var game = GameWindow.Find() ?? throw new InvalidOperationException("One visible Fortnite window is required.");
+        using var capture = new BackgroundGameCapture(game);
+        using var bitmap = await capture.CaptureAsync(CancellationToken.None)
+            ?? throw new InvalidOperationException("Fortnite did not provide a current frame.");
+        Directory.CreateDirectory(outputDirectory);
+        var path = Path.Combine(outputDirectory, "current-fortnite.png");
+        bitmap.Save(path, ImageFormat.Png);
+        await AnalyzeFile(path, outputDirectory);
     }
 }

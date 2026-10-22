@@ -33,6 +33,20 @@ public static class MissionRewardReader
             return [];
         }
 
+        if (screen.Kind == ScreenKind.RewardClaim && frame.Has(@"^ACCOUNT RESOURCE$"))
+        {
+            var quantities = frame.Regions.Where(r => !r.Pass.EndsWith("-word", StringComparison.Ordinal))
+                .Select(r => Regex.Match(r.Text.Trim(), $@"^(?<count>{Number})\s+SEASON(?:\s+XP)?$", RegexOptions.IgnoreCase))
+                .Where(match => match.Success)
+                .Select(match => long.TryParse(match.Groups["count"].Value.Replace(",", ""),
+                    NumberStyles.None, CultureInfo.InvariantCulture, out var count) ? count : 0)
+                .Where(count => count > 0).Distinct().ToArray();
+            if (quantities.Length > 0)
+            {
+                return [new("Season XP", quantities.Length == 1 ? quantities[0] : null, "★")];
+            }
+        }
+
         if (ReadCard(frame) is { } card)
         {
             return [card];

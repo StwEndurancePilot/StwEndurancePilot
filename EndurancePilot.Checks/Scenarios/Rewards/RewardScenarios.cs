@@ -137,11 +137,30 @@ internal static class RewardScenarios
             new("ACCOUNT RESOURCE", new(700,200,250,25)), new("28,000 SEASON XP", new(700,240,300,40)),
             new("Thanks for playing Save the", new(100,250,400,30)),
             new("CLAIM", new(700,650,100,25)), new("CLAIM", new(701,662,100,28)),
-            new("EQUIP", new(500,650,100,25)), new("GO TO LOCKER", new(100,650,200,25)) };
+            new("EQUIP", new(500,650,100,25)), new("GO TO LOCKER", new(100,650,200,25)),
+            new("Used to increase the Fortnite Season Level.", new(700,300,360,20)) };
         Observation Reward(int time) => new(epoch.AddSeconds(time), 1280, 720, regions);
         var frame = Reward(0);
         var evidence = recognizer.Recognize(frame);
         check("Season XP claim is recognised independently of mission completion", evidence.Kind == ScreenKind.RewardClaim);
+        var wrappedXp = frame with
+        {
+            Regions = regions.Select(region => region.Text == "28,000 SEASON XP"
+                ? region with { Text = "302,300 SEASON" } : region).Append(new("World!", new(100, 285, 90, 20))).ToArray()
+        };
+        check("Wrapped Season XP without OCR reading XP is recognised", recognizer.Recognize(wrappedXp).Kind == ScreenKind.RewardClaim);
+        check("Wrapped Season XP still plans the Claim button", NavigationPlanner.Decide(wrappedXp,
+            recognizer.Recognize(wrappedXp), new()).Plan?.Step == NavigationStep.ClaimReward);
+        check("Wrapped Season XP records its visible exact amount", MissionRewardReader.Read(wrappedXp,
+            recognizer.Recognize(wrappedXp)) is [{ Name: "Season XP", Quantity: 302300 }]);
+        check("Equip and Claim work even when XP details are unreadable", recognizer.Recognize(wrappedXp with
+        {
+            Regions = wrappedXp.Regions.Where(region => region.Text is "EQUIP" or "CLAIM").ToArray()
+        }).Kind == ScreenKind.RewardClaim);
+        check("Claim without Equip cannot identify this reward page", recognizer.Recognize(wrappedXp with
+        {
+            Regions = wrappedXp.Regions.Where(region => region.Text != "EQUIP").ToArray()
+        }).Kind != ScreenKind.RewardClaim);
         var plan = NavigationPlanner.Decide(frame, evidence, new()).Plan;
         check("Reward can be claimed before a zone is configured", plan?.Step == NavigationStep.ClaimReward);
         check("Claim target uses the overlap of shifted OCR readings", plan?.Target == new Box(701, 662, 99, 13));

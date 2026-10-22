@@ -139,10 +139,12 @@ public sealed class ScreenRecognizer
             return leave;
         }
 
-        if (Has(@"^ACCOUNT RESOURCE$") && Has(@"\bSEASON XP$")
-            && Has(@"\bTHANKS FOR PLAYING SAVE THE\b") && Has(@"^CLAIM$"))
+        var claim = NavigationPlanner.RewardClaimTarget(frame);
+        if (claim is { } claimButton && claimButton.CenterY > frame.Height * .55
+            && frame.Find(@"^EQUIP$").Any(equip => equip.Bounds.Right < claimButton.X
+                && Math.Abs(equip.Bounds.CenterY - claimButton.CenterY) < Math.Max(equip.Bounds.Height, claimButton.Height) * 2))
         {
-            return Result(ScreenKind.RewardClaim, "Save the World Season XP reward and Claim control", @"^CLAIM$");
+            return Result(ScreenKind.RewardClaim, "Equip and Claim reward controls on the same row", @"^CLAIM$");
         }
 
         if (Has(@"^(MISSION REWARDS|[YV]OU RECEIVED|QUEST COMPLETE)$")

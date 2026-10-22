@@ -10,6 +10,7 @@ public sealed partial class MainForm
     private readonly InteractionPause interactionPause = new();
     private DateTimeOffset confirmedHubAt;
     private DateTimeOffset confirmedSleepAt;
+    private DateTimeOffset confirmedClaimAt;
     internal bool InputPaused => runner.IsRunning && interactionPause.Active;
     private void WaitForUserInput(string reason)
     {

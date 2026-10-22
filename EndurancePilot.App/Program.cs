@@ -9,6 +9,20 @@ static class Program
 
         ApplicationConfiguration.Initialize();
         CompactNativeLibrary.Initialize();
+        if (args.Length == 2 && args[0] == "--analyze-current-screen")
+        {
+            try
+            {
+                Inspection.AnalyzeCurrentScreen(args[1]).GetAwaiter().GetResult();
+            }
+            catch (Exception error)
+            {
+                Directory.CreateDirectory(args[1]);
+                File.WriteAllText(Path.Combine(args[1], "error.txt"), error.ToString());
+                Environment.ExitCode = 1;
+            }
+            return;
+        }
         if (args.Length == 4 && args[0] == "--verify-end-game")
         {
             try
