@@ -16,6 +16,9 @@ internal static class SettingsChecks
             Check("End at target defaults on", store.Load(out warning).EndRunWhenTargetReached);
             Check("Wait for assistance defaults off", !store.Load(out warning).WaitForAssistance);
             Check("Auto resume defaults to ten idle seconds", store.Load(out warning) is { AutoResumeFortnite: true, AutoResumeIdleSeconds: 10 });
+            Check("Existing shortcut defaults to F10", store.Load(out warning).StartStopHotkey == "F10"
+                && RunnerHotkey.Resolve("F10") is (0x4000u, 0x79u));
+            Check("Modified shortcut maps to Ctrl+Alt+F9", RunnerHotkey.Resolve("Ctrl+Alt+F9") is (0x4003u, 0x78u));
             var saved = new RunnerSettings(EndurancePilot.Core.HomebaseZone.CannyValley, 3, false, false);
             store.Save(saved);
             Check("Preferences survive a new store instance", new SettingsStore(path).Load(out warning) == saved && warning is null);
@@ -63,6 +66,9 @@ internal static class SettingsChecks
             saved = saved with { AutoResumeFortnite = false, AutoResumeIdleSeconds = 23 };
             store.Save(saved);
             Check("Auto resume toggle and delay survive restart", new SettingsStore(path).Load(out warning) == saved && warning is null);
+            saved = saved with { StartStopHotkey = "Ctrl+Alt+F8" };
+            store.Save(saved);
+            Check("Custom start/stop shortcut survives restart", new SettingsStore(path).Load(out warning) == saved && warning is null);
             var priorContext = SynchronizationContext.Current;
             var host = new MainForm(store);
             try
@@ -121,6 +127,7 @@ internal static class SettingsChecks
             Check("Existing settings retain automatic target exit", legacy.EndRunWhenTargetReached);
             Check("Existing settings retain solo Endurance", !legacy.WaitForAssistance);
             Check("Existing settings receive the auto resume defaults", legacy is { AutoResumeFortnite: true, AutoResumeIdleSeconds: 10 });
+            Check("Existing settings retain F10 as the shortcut", legacy.StartStopHotkey == "F10");
             File.WriteAllText(path, "{\"Zone\":\"TwinePeaks\",\"AttemptLimit\":2,\"AfkBaseReady\":false,\"LaunchIfMissing\":true}");
             Check("Removed AFK preference does not invalidate existing settings", store.Load(out warning) == legacy && warning is null);
             File.WriteAllText(path, "broken json");
@@ -144,6 +151,10 @@ internal static class SettingsChecks
                 catch (InvalidDataException) { rejected = true; }
                 Check($"Invalid target wave {wave} cannot be saved", rejected);
             }
+            rejected = false;
+            try { store.Save(new(StartStopHotkey: "Escape")); }
+            catch (InvalidDataException) { rejected = true; }
+            Check("Unsupported global shortcut cannot be saved", rejected);
         }
         catch (Exception error) { report.Add(new("Settings checks", false, error.Message)); }
         finally

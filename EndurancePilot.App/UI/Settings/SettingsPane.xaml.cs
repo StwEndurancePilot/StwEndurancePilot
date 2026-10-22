@@ -12,6 +12,8 @@ public partial class SettingsPane : System.Windows.Controls.UserControl
     private readonly Func<int, string?> saveTargetWave;
     private readonly Func<bool, string?> saveEndAtTarget;
     private readonly Func<bool, string?> saveAssistance;
+    private readonly Func<bool, int, string?> saveFocusWhenIdle;
+    private readonly Func<string, string?> saveHotkey;
     private bool savedEndAtTarget;
     private bool? running;
     private bool updating;
@@ -19,10 +21,14 @@ public partial class SettingsPane : System.Windows.Controls.UserControl
     private bool savedManualTheme;
     private bool savedIndefinite;
     private bool savedAssistance;
+    private bool savedFocusWhenIdle;
+    private int savedFocusIdleSeconds;
+    private string savedHotkey;
 
     internal SettingsPane(RunnerSettings settings, Func<bool, string?> saveLaunch, Func<bool, string?> saveManualTheme, Func<bool, string?> saveIndefinite, Func<int, string?> saveTargetWave,
         Func<WebhookSettings, string?> saveWebhook, Func<WebhookEvent?, Task<string>> testWebhook,
-        Func<bool, string?> saveEndAtTarget, Func<bool, string?> saveAssistance)
+        Func<bool, string?> saveEndAtTarget, Func<bool, string?> saveAssistance,
+        Func<bool, int, string?> saveFocusWhenIdle, Func<string, string?> saveHotkey)
     {
         InitializeComponent();
         SetUpdates(new(UpdateStatus.NotChecked, "Updates are checked when Pilot opens."));
@@ -33,6 +39,27 @@ public partial class SettingsPane : System.Windows.Controls.UserControl
         this.saveTargetWave = saveTargetWave;
         this.saveEndAtTarget = saveEndAtTarget;
         this.saveAssistance = saveAssistance;
+        this.saveFocusWhenIdle = saveFocusWhenIdle;
+        this.saveHotkey = saveHotkey;
+        HotkeyChoice.ItemsSource = RunnerHotkey.Choices;
+        HotkeyChoice.SelectedItem = savedHotkey = settings.StartStopHotkey;
+        HotkeyChoice.SelectionChanged += (_, _) => HotkeyChanged();
+        FocusWhenIdleToggle.IsChecked = savedFocusWhenIdle = settings.AutoResumeFortnite;
+        FocusIdleSecondsInput.Value = savedFocusIdleSeconds = settings.AutoResumeIdleSeconds;
+        FocusIdleSecondsInput.IsEnabled = savedFocusWhenIdle;
+        FocusWhenIdleToggle.Checked += FocusWhenIdleChanged;
+        FocusWhenIdleToggle.Unchecked += FocusWhenIdleChanged;
+        FocusIdleSecondsInput.ValueChanged += (_, _) => FocusIdleSecondsChanged();
+        FocusIdleSecondsInput.LostKeyboardFocus += (_, _) =>
+        {
+            if (FocusIdleSecondsInput.Value is not { } value || !double.IsFinite(value)
+                || value != Math.Truncate(value) || value is < 2 or > 600)
+            {
+                updating = true;
+                FocusIdleSecondsInput.Value = savedFocusIdleSeconds;
+                updating = false;
+            }
+        };
         AssistanceToggle.IsChecked = savedAssistance = settings.WaitForAssistance;
         AssistanceToggle.Checked += AssistanceChanged;
         AssistanceToggle.Unchecked += AssistanceChanged;
@@ -70,11 +97,74 @@ public partial class SettingsPane : System.Windows.Controls.UserControl
 
         running = value;
         RunOptions.IsEnabled = !value;
-        SaveStatus.Text = value ? "Stop to change run options. Appearance and Discord stay available." : "Changes save automatically, except the webhook URL.";
+        SaveStatus.Text = value ? "Stop to change run options. Focus, appearance and Discord stay available." : "Changes save automatically, except the webhook URL.";
         SaveStatus.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "PilotSecondary");
     }
 
     private int savedTargetWave;
+    private void HotkeyChanged()
+    {
+        if (updating || HotkeyChoice.SelectedItem is not string choice || choice == savedHotkey)
+        {
+            return;
+        }
+
+        string? error = saveHotkey(choice);
+        if (error is null)
+        {
+            savedHotkey = choice;
+        }
+        else
+        {
+            updating = true;
+            HotkeyChoice.SelectedItem = savedHotkey;
+            updating = false;
+        }
+        ShowSaveResult(error);
+    }
+    private void FocusWhenIdleChanged(object sender, RoutedEventArgs e)
+    {
+        if (updating)
+        {
+            return;
+        }
+
+        bool enabled = FocusWhenIdleToggle.IsChecked == true;
+        string? error = saveFocusWhenIdle(enabled, savedFocusIdleSeconds);
+        if (error is null)
+        {
+            savedFocusWhenIdle = enabled;
+            FocusIdleSecondsInput.IsEnabled = enabled;
+        }
+        else
+        {
+            updating = true;
+            FocusWhenIdleToggle.IsChecked = savedFocusWhenIdle;
+            updating = false;
+        }
+        ShowSaveResult(error);
+    }
+    private void FocusIdleSecondsChanged()
+    {
+        if (updating || FocusIdleSecondsInput.Value is not { } value || !double.IsFinite(value)
+            || value != Math.Truncate(value) || value is < 2 or > 600)
+        {
+            return;
+        }
+
+        string? error = saveFocusWhenIdle(savedFocusWhenIdle, (int)value);
+        if (error is null)
+        {
+            savedFocusIdleSeconds = (int)value;
+        }
+        else
+        {
+            updating = true;
+            FocusIdleSecondsInput.Value = savedFocusIdleSeconds;
+            updating = false;
+        }
+        ShowSaveResult(error);
+    }
     private void TargetWaveChanged()
     {
         if (updating || running == true)

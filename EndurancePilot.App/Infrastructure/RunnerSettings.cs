@@ -7,7 +7,8 @@ internal sealed record RunnerSettings(HomebaseZone Zone = HomebaseZone.TwinePeak
     bool LaunchIfMissing = true, bool RunIndefinitely = true,
     bool ManualThemeEnabled = false, bool ManualDarkTheme = true, int TargetWave = 30,
     WebhookSettings? Webhook = null, bool EndRunWhenTargetReached = true, bool WaitForAssistance = false,
-    bool AutoResumeFortnite = true, int AutoResumeIdleSeconds = 10)
+    bool AutoResumeFortnite = true, int AutoResumeIdleSeconds = 10,
+    string StartStopHotkey = RunnerHotkey.Default)
 {
     public void Validate()
     {
@@ -23,8 +24,9 @@ internal sealed record RunnerSettings(HomebaseZone Zone = HomebaseZone.TwinePeak
         }
         if (AutoResumeIdleSeconds is < 2 or > 600)
         {
-            throw new InvalidDataException("Choose an auto resume delay from 2 to 600 seconds.");
+            throw new InvalidDataException("Choose a Fortnite focus delay from 2 to 600 seconds.");
         }
+        _ = RunnerHotkey.Resolve(StartStopHotkey);
     }
 }
 

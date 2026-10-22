@@ -3,7 +3,7 @@ using EndurancePilot.Core;
 namespace EndurancePilot.App;
 
 internal sealed record PilotSnapshot(bool Running, bool Attention, string Headline, string Detail, int? Wave,
-    string WaveCaption, TimeSpan Elapsed, int Completed, int AttemptsEnded, int? AttemptLimit, string Activity);
+    int Completed, string Activity);
 
 public sealed partial class MainForm
 {
@@ -37,16 +37,74 @@ public sealed partial class MainForm
     internal void InitializeBridge()
     {
         _ = Handle;
-        stopHotkeyRegistered = RegisterHotKey(Handle, StopHotkeyId, 0x4000, 0x79);
+        var (modifiers, key) = RunnerHotkey.Resolve(startStopHotkey);
+        stopHotkeyRegistered = RegisterHotKey(Handle, StopHotkeyId, modifiers, key);
         status.Text = stopHotkeyRegistered ? "Keep Fortnite active and focused while running."
-            : "The start/stop shortcut is unavailable. Close other apps using F10 and reopen Endurance Pilot.";
+            : $"The {startStopHotkey} shortcut is unavailable. Choose another shortcut in Settings.";
         FormClosing += (_, e) => { if (!shuttingDown && e.CloseReason == CloseReason.UserClosing) { e.Cancel = true; Hide(); } };
         AddActivity("Early access: full unattended wave-30 repeat is not yet verified. Tiny 25% HUD text is still a known gap.");
     }
 
     internal RunnerSettings ReadSettings() => new((HomebaseZone)zone.SelectedItem!, (int)runLimit.Value,
         launchIfMissing.Checked, indefinite.Checked, manualThemeEnabled, manualDarkTheme, targetWave, webhook,
-        endRunWhenTargetReached, waitForAssistance, autoResumeFortnite, autoResumeIdleSeconds);
+        endRunWhenTargetReached, waitForAssistance, autoResumeFortnite, autoResumeIdleSeconds, startStopHotkey);
+    internal void SetHotkey(string choice)
+    {
+        var next = ReadSettings() with { StartStopHotkey = choice };
+        next.Validate();
+        if (choice == startStopHotkey)
+        {
+            return;
+        }
+
+        string previous = startStopHotkey;
+        bool hadPrevious = stopHotkeyRegistered;
+        if (hadPrevious && !UnregisterHotKey(Handle, StopHotkeyId))
+        {
+            throw new InvalidOperationException($"Could not release {previous}; it remains selected.");
+        }
+        stopHotkeyRegistered = false;
+        var (modifiers, key) = RunnerHotkey.Resolve(choice);
+        if (!RegisterHotKey(Handle, StopHotkeyId, modifiers, key))
+        {
+            bool restored = RestoreHotkey(previous, hadPrevious);
+            throw new InvalidOperationException(restored
+                ? $"{choice} is unavailable. {previous} remains active."
+                : $"{choice} is unavailable, and {previous} could not be restored. Choose another shortcut.");
+        }
+
+        stopHotkeyRegistered = true;
+        try
+        {
+            settingsStore.Save(next);
+        }
+        catch
+        {
+            UnregisterHotKey(Handle, StopHotkeyId);
+            _ = RestoreHotkey(previous, hadPrevious);
+            throw;
+        }
+
+        startStopHotkey = choice;
+        if (stopButton is not null) stopButton.Text = "Stop · " + choice;
+        status.Text = "Start/stop shortcut: " + choice;
+    }
+    private bool RestoreHotkey(string choice, bool wasRegistered)
+    {
+        if (!wasRegistered)
+        {
+            stopHotkeyRegistered = false;
+            return false;
+        }
+
+        var (modifiers, key) = RunnerHotkey.Resolve(choice);
+        stopHotkeyRegistered = RegisterHotKey(Handle, StopHotkeyId, modifiers, key);
+        if (!stopHotkeyRegistered)
+        {
+            status.Text = $"Could not restore {choice}; choose another shortcut in Settings.";
+        }
+        return stopHotkeyRegistered;
+    }
     internal void SetAutoResume(bool enabled, int idleSeconds)
     {
         var next = ReadSettings() with { AutoResumeFortnite = enabled, AutoResumeIdleSeconds = idleSeconds };
@@ -64,7 +122,8 @@ public sealed partial class MainForm
 
         value = value with
         {
-            Webhook = value.Webhook ?? webhook
+            Webhook = value.Webhook ?? webhook,
+            StartStopHotkey = startStopHotkey
         };
         value.Validate();
         settingsStore.Save(value);
@@ -116,7 +175,7 @@ public sealed partial class MainForm
         {
             heading = "Paused for your input";
             detail = autoResumeFortnite
-                ? $"Fortnite resumes after {autoResumeIdleSeconds} seconds without keyboard or mouse input, or click Resume."
+                ? $"Focusing Fortnite after {autoResumeIdleSeconds} seconds without keyboard or mouse input, or click Resume."
                 : "Focus Fortnite and leave input idle for 2 seconds, or click Resume.";
         }
         if (runner.IsRunning && status.Text.StartsWith("Observation paused"))
@@ -135,18 +194,9 @@ public sealed partial class MainForm
         }
 
         var current = tracker.Current;
-        string caption = current is null ? "" : current.Outcome switch
-        {
-            RunOutcome.InProgress => "Highest wave confirmed in this run.",
-            RunOutcome.Completed30 => "Wave 30 and victory confirmed.",
-            RunOutcome.ReachedTarget => "Target reached; mission exit confirmed.",
-            RunOutcome.Failed => "Last run ended in defeat.",
-            RunOutcome.Interrupted => "Last run was interrupted.",
-            _ => "Victory detected. Wave 30 was not confirmed."
-        };
-        var elapsed = runner.StartedAt is { } started ? (stoppedAt ?? DateTimeOffset.UtcNow) - started : TimeSpan.Zero;
-        return new(runner.IsRunning, attention, heading, detail, current?.HighestWave, caption, elapsed, runSession.CompletedRuns,
-            runSession.AttemptsEnded, runner.StartedAt is null ? indefinite.Checked ? null : (int)runLimit.Value : runSession.AttemptLimit,
+        int? activeWave = runner.IsRunning && current is { Outcome: RunOutcome.InProgress, EndedAt: null }
+            ? current.HighestWave : null;
+        return new(runner.IsRunning, attention, heading, detail, activeWave, runSession.CompletedRuns,
             string.Join(Environment.NewLine, activity.Items.Cast<string>().Reverse().Take(80)));
     }
     internal void ShowTechnicalDetails()

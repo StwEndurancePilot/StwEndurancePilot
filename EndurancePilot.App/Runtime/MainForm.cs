@@ -43,6 +43,8 @@ public sealed partial class MainForm : Form
     private readonly System.Windows.Forms.Timer timer = new() { Interval = 2500 };
     private bool busy;
     private bool stopHotkeyRegistered;
+    private string startStopHotkey = RunnerHotkey.Default;
+    private Button? stopButton;
     private bool closed;
     private int session;
     private ScreenKind lastScreen;
@@ -77,7 +79,7 @@ public sealed partial class MainForm : Form
         });
         startButtons.Add(AddButton(buttons, "Observe only", () => { Start(recover: false); return Task.CompletedTask; }));
         startButtons.Add(AddButton(buttons, "Errors & rewards only", () => { Start(recover: true); return Task.CompletedTask; }));
-        AddButton(buttons, "Stop · F10", () => { Stop("Stopped by user"); return Task.CompletedTask; });
+        stopButton = AddButton(buttons, "Stop · F10", () => { Stop("Stopped by user"); return Task.CompletedTask; });
         AddButton(buttons, "Open logs", () =>
         {
             Directory.CreateDirectory(log.DirectoryPath);
@@ -87,6 +89,8 @@ public sealed partial class MainForm : Form
         var settings = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(16, 4, 12, 4) };
         zone.Items.AddRange(Enum.GetValues<HomebaseZone>().Where(z => z != HomebaseZone.Unspecified).Cast<object>().ToArray());
         var saved = settingsStore.Load(out var settingsWarning);
+        startStopHotkey = saved.StartStopHotkey;
+        stopButton.Text = "Stop · " + startStopHotkey;
         webhook = saved.Webhook ?? new();
         notifier.Configure(webhook);
         notifications = new RunNotifications(Notify, NotifyRewards);
@@ -319,6 +323,7 @@ public sealed partial class MainForm : Form
                     if (idle && resumeUnattended && game.Activate())
                     {
                         interactionPause.Begin();
+                        InputPauseChanged?.Invoke();
                         timer.Interval = 250;
                         status.Text = "Focusing Fortnite · waiting for fresh screen evidence";
                         return;
@@ -434,7 +439,7 @@ public sealed partial class MainForm : Form
     {
         if (recover && !stopHotkeyRegistered)
         {
-            status.Text = "Recovery requires the global stop shortcut. Close other apps using F10 and reopen this app.";
+            status.Text = $"Recovery requires the global {startStopHotkey} shortcut. Choose another shortcut in Settings if it is unavailable.";
             return;
         }
         var game = GameWindow.Find();
@@ -816,6 +821,10 @@ public sealed partial class MainForm : Form
 
     private void RecordOutcome(RunRecord outcome)
     {
+        if (outcome.Outcome is RunOutcome.Completed30 or RunOutcome.ReachedTarget)
+        {
+            Earnings.RecordCompletedRun(outcome.Id);
+        }
         if (notificationSession)
         {
             notifications.Outcome(outcome, controller.Profile.TargetWave);

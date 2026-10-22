@@ -30,7 +30,7 @@ internal static class SettingsPreview
             var rewards = new RewardPanel();
             rewards.Update(true,
                 WebhookSamples.RewardItems,
-                "Total quantity per reward across completed receipts this session.", "Session earnings");
+                "Total quantity per reward across completed receipts this session.", "Session earnings", 4, "This session");
             var rewardFrame = new System.Windows.Controls.Border
             {
                 Background = (System.Windows.Media.Brush)app.Resources["PilotBackground"],
@@ -65,7 +65,7 @@ internal static class SettingsPreview
                 bannerEncoder.Save(file);
             }
 
-            var pane = new SettingsPane(new(), _ => null, _ => null, _ => null, _ => null, _ => null, _ => Task.FromResult("Offline preview"), _ => null, _ => null);
+            var pane = new SettingsPane(new(), _ => null, _ => null, _ => null, _ => null, _ => null, _ => Task.FromResult("Offline preview"), _ => null, _ => null, (_, _) => null, _ => null);
             pane.SetRunning(false);
             pane.SetWebhookStatus("Notifications are off.");
             pane.Measure(new System.Windows.Size(width, 650));
@@ -79,6 +79,18 @@ internal static class SettingsPreview
             scroll.ScrollToVerticalOffset(runOptions.TransformToAncestor(scroll).Transform(new System.Windows.Point()).Y - 35);
             pane.UpdateLayout();
             Save("run-options");
+            scroll.ScrollToTop();
+            pane.UpdateLayout();
+            var focus = (FrameworkElement)pane.FindName("FocusWhenIdleToggle");
+            scroll.ScrollToVerticalOffset(focus.TransformToAncestor(scroll).Transform(new System.Windows.Point()).Y - 90);
+            pane.UpdateLayout();
+            Save("focus");
+            scroll.ScrollToTop();
+            pane.UpdateLayout();
+            var hotkey = (FrameworkElement)pane.FindName("HotkeyChoice");
+            scroll.ScrollToVerticalOffset(hotkey.TransformToAncestor(scroll).Transform(new System.Windows.Point()).Y - 160);
+            pane.UpdateLayout();
+            Save("shortcut");
             scroll.ScrollToTop();
             pane.UpdateLayout();
             var toggle = (FrameworkElement)pane.FindName("WebhookToggle");

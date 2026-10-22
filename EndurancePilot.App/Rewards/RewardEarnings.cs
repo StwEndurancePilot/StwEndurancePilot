@@ -5,7 +5,8 @@ namespace EndurancePilot.App;
 
 internal sealed class RewardEarnings
 {
-    internal sealed record Saved(Dictionary<string, long> Totals, HashSet<Guid> Receipts);
+    internal sealed record Saved(Dictionary<string, long> Totals, HashSet<Guid> Receipts,
+        long CompletedRuns = 0, HashSet<Guid>? CompletedRunIds = null);
     private readonly string path;
     private Saved saved = new(new(StringComparer.OrdinalIgnoreCase), []);
     private readonly Dictionary<string, long> session = new(StringComparer.OrdinalIgnoreCase);
@@ -24,12 +25,14 @@ internal sealed class RewardEarnings
             {
                 var data = JsonSerializer.Deserialize<Saved>(File.ReadAllText(this.path))
                     ?? throw new InvalidDataException("Empty earnings file.");
-                if (data.Totals is null || data.Receipts is null || data.Totals.Any(x => x.Value < 0))
+                if (data.Totals is null || data.Receipts is null || data.Totals.Any(x => x.Value < 0)
+                    || data.CompletedRuns < 0 || data.CompletedRunIds is null && data.CompletedRuns != 0)
                 {
                     throw new InvalidDataException("Invalid earnings file.");
                 }
 
-                saved = new(new(data.Totals, StringComparer.OrdinalIgnoreCase), data.Receipts);
+                saved = new(new(data.Totals, StringComparer.OrdinalIgnoreCase), data.Receipts,
+                    data.CompletedRuns, data.CompletedRunIds ?? []);
             }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException or InvalidDataException)
@@ -40,6 +43,7 @@ internal sealed class RewardEarnings
     }
     internal IReadOnlyList<MissionReward> Session => Rows(session);
     internal IReadOnlyList<MissionReward> Lifetime => Rows(saved.Totals);
+    internal long LifetimeCompletedRuns => saved.CompletedRuns;
     private static MissionReward[] Rows(Dictionary<string, long> values) => values.OrderBy(x => x.Key)
         .Select(x => new MissionReward(x.Key, x.Value, "◇")).ToArray();
     internal void StartSession() => session.Clear();
@@ -60,10 +64,8 @@ internal sealed class RewardEarnings
                 totals[item.Name] = checked(totals.GetValueOrDefault(item.Name) + item.Quantity!.Value);
                 current[item.Name] = checked(current.GetValueOrDefault(item.Name) + item.Quantity!.Value);
             }
-            var next = new Saved(totals, new(saved.Receipts) { receipt });
-            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
-            File.WriteAllText(path + ".tmp", JsonSerializer.Serialize(next));
-            File.Move(path + ".tmp", path, true);
+            var next = saved with { Totals = totals, Receipts = new(saved.Receipts) { receipt } };
+            Save(next);
             saved = next;
             session.Clear();
             foreach (var pair in current)
@@ -79,5 +81,35 @@ internal sealed class RewardEarnings
             Warning = "Earnings could not be saved. Totals will retry on the next observation.";
             return false;
         }
+    }
+    internal bool RecordCompletedRun(Guid runId)
+    {
+        if (!readable || (saved.CompletedRunIds?.Contains(runId) ?? false))
+        {
+            return false;
+        }
+        try
+        {
+            var next = saved with
+            {
+                CompletedRuns = checked(saved.CompletedRuns + 1),
+                CompletedRunIds = new(saved.CompletedRunIds ?? []) { runId }
+            };
+            Save(next);
+            saved = next;
+            Warning = null;
+            return true;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or OverflowException)
+        {
+            Warning = "Run history could not be saved. Check access to the earnings file.";
+            return false;
+        }
+    }
+    private void Save(Saved next)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+        File.WriteAllText(path + ".tmp", JsonSerializer.Serialize(next));
+        File.Move(path + ".tmp", path, true);
     }
 }

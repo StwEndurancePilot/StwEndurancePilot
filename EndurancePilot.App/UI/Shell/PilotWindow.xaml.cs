@@ -32,6 +32,10 @@ public partial class PilotWindow : FluentWindow
         Height = Math.Min(690, SystemParameters.WorkArea.Height - 32);
         host = new MainForm();
         host.RunnerToggleRequested += ToggleFromControls;
+        host.InputPauseChanged += () => Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (loaded) RefreshState();
+        }));
         host.InitializeBridge();
         ApplyThemePreference();
         var settings = host.ReadSettings();
@@ -39,8 +43,6 @@ public partial class PilotWindow : FluentWindow
             .Select(z => new { Zone = z, Label = z switch { HomebaseZone.TwinePeaks => "Twine Peaks", HomebaseZone.CannyValley => "Canny Valley", _ => z.ToString() } }).ToArray();
         ZoneChoice.SelectedValue = settings.Zone;
         AttemptInput.Value = settings.AttemptLimit;
-        AutoResumeToggle.IsChecked = settings.AutoResumeFortnite;
-        AutoResumeSecondsInput.Value = settings.AutoResumeIdleSeconds;
         for (int i = 0; i < 30; i++)
         {
             WaveSegments.Children.Add(new Border { CornerRadius = new CornerRadius(2), Margin = new Thickness(0, 0, i == 29 ? 0 : 4, 0) });
@@ -71,37 +73,6 @@ public partial class PilotWindow : FluentWindow
         Closed += (_, _) => { refresh.Stop(); host.ShutdownBridge(); activityWindow?.Close(); };
         ZoneChoice.SelectionChanged += (_, _) => SaveOptions();
         AttemptInput.ValueChanged += (_, _) => SaveOptions();
-        AutoResumeToggle.Checked += (_, _) => SaveAutoResume();
-        AutoResumeToggle.Unchecked += (_, _) => SaveAutoResume();
-        AutoResumeSecondsInput.ValueChanged += (_, _) => SaveAutoResume();
-        AutoResumeSecondsInput.LostKeyboardFocus += (_, _) =>
-        {
-            if (AutoResumeSecondsInput.Value is null)
-            {
-                AutoResumeSecondsInput.Value = host.ReadSettings().AutoResumeIdleSeconds;
-            }
-        };
-    }
-
-    private void SaveAutoResume()
-    {
-        if (!loaded || AutoResumeSecondsInput.Value is not { } seconds || !double.IsFinite(seconds)
-            || seconds != Math.Truncate(seconds) || seconds is < 2 or > 600)
-        {
-            return;
-        }
-
-        try
-        {
-            host.SetAutoResume(AutoResumeToggle.IsChecked == true, (int)seconds);
-            settingsError = null;
-            RefreshState();
-        }
-        catch (Exception error)
-        {
-            settingsError = error.Message;
-            StatusDetail.Text = error.Message;
-        }
     }
 
     private bool SaveOptions()
@@ -170,9 +141,16 @@ public partial class PilotWindow : FluentWindow
         };
         string rewardStatus = EarningsView.SelectedIndex == 1 ? host.Rewards.Status
             : earnings.Warning ?? (items.Count == 0 ? "No recorded rewards yet."
-                : EarningsView.SelectedIndex == 2 ? "Saved across sessions and app restarts. Known quantities only."
+                : EarningsView.SelectedIndex == 2 ? ""
                 : "Total quantity per reward across completed receipts this session.");
-        MissionRewards.Update(true, items, rewardStatus, rewardTitle);
+        long? completedRuns = EarningsView.SelectedIndex switch
+        {
+            1 => null,
+            2 => earnings.LifetimeCompletedRuns,
+            _ => s.Completed
+        };
+        MissionRewards.Update(true, items, rewardStatus, rewardTitle, completedRuns,
+            EarningsView.SelectedIndex == 2 ? "Recorded on this device" : "This session");
         bool indefinite = host.ReadSettings().RunIndefinitely;
         AttemptGap.Width = new GridLength(indefinite ? 0 : 14);
         AttemptColumn.Width = new GridLength(indefinite ? 0 : 125);
@@ -184,9 +162,6 @@ public partial class PilotWindow : FluentWindow
         StatusDetail.ToolTip = StatusDetail.Text;
         PrimaryButton.ToolTip = StatusDetail.Text;
         WaveNumber.Text = (s.Wave ?? 0).ToString("00");
-        WaveCaption.Text = s.WaveCaption;
-        WaveCaption.Visibility = string.IsNullOrEmpty(s.WaveCaption) ? Visibility.Collapsed : Visibility.Visible;
-        WaveSegments.Margin = new Thickness(0, 0, 0, string.IsNullOrEmpty(s.WaveCaption) ? 0 : 15);
         int targetWave = host.ReadSettings().EndRunWhenTargetReached ? host.ReadSettings().TargetWave : 30;
         WaveTarget.Text = $"/ {targetWave}";
         if (WaveSegments.Children.Count != targetWave)
@@ -198,15 +173,13 @@ public partial class PilotWindow : FluentWindow
             }
         }
         System.Windows.Automation.AutomationProperties.SetName(WaveNumber, s.Wave is null ? "No wave detected" : $"Highest confirmed wave {s.Wave}; target {targetWave}");
-        ElapsedText.Text = $"{(int)s.Elapsed.TotalHours:00}:{s.Elapsed.Minutes:00}:{s.Elapsed.Seconds:00}";
-        CompletedText.Text = s.Completed.ToString();
-        AttemptSummary.Text = s.Running
-            ? s.AttemptLimit is { } limit ? $"{s.AttemptsEnded} of {limit} attempts finished" : $"{s.AttemptsEnded} attempts finished · Indefinite"
-            : indefinite ? "No attempt limit. Stop whenever you’re ready." : "Stop automatically at your attempt limit.";
         PrimaryText.Text = s.Running ? "Stop runner" : "Start endurance";
-        ResumeButton.Visibility = host.InputPaused && !s.Attention ? Visibility.Visible : Visibility.Collapsed;
-        AutoResumeSecondsInput.IsEnabled = AutoResumeToggle.IsChecked == true;
-        ShortcutText.Text = s.Running ? "F10 to stop" : "F10 to start";
+        var resume = host.ResumePrompt();
+        ResumeButton.Content = resume.Label;
+        ResumeButton.Visibility = resume.Visible && !s.Attention ? Visibility.Visible : Visibility.Collapsed;
+        System.Windows.Automation.AutomationProperties.SetName(ResumeButton, resume.Label);
+        string hotkey = host.ReadSettings().StartStopHotkey;
+        ShortcutText.Text = s.Running ? $"{hotkey} to stop" : $"{hotkey} to start";
         PrimaryIcon.Symbol = s.Running ? SymbolRegular.Stop24 : SymbolRegular.Play24;
         ApplyPrimaryButtonPalette(s.Running);
         System.Windows.Automation.AutomationProperties.SetName(PrimaryButton, PrimaryText.Text);
@@ -452,6 +425,24 @@ public partial class PilotWindow : FluentWindow
                 {
                     WaitForAssistance = waitForAssistance
                 });
+                return null;
+            }
+            catch (Exception error) { return error.Message; }
+        }, (enabled, seconds) =>
+        {
+            try
+            {
+                host.SetAutoResume(enabled, seconds);
+                RefreshState();
+                return null;
+            }
+            catch (Exception error) { return error.Message; }
+        }, choice =>
+        {
+            try
+            {
+                host.SetHotkey(choice);
+                RefreshState();
                 return null;
             }
             catch (Exception error) { return error.Message; }

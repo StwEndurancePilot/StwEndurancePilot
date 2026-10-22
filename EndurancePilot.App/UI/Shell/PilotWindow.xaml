@@ -81,28 +81,11 @@
                   <TextBlock x:Name="WaveNumber" Text="00" FontFamily="Bahnschrift, Segoe UI" FontSize="104" FontWeight="SemiBold" Foreground="{DynamicResource PilotAccent}" />
                   <TextBlock x:Name="WaveTarget" Text="/ 30" Grid.Column="1" FontSize="24" Margin="12,0,0,19" VerticalAlignment="Bottom" Foreground="{DynamicResource PilotSecondary}" />
                 </Grid>
-                <UniformGrid x:Name="WaveSegments" Rows="1" Height="23" Margin="0,0,0,15" />
-                <TextBlock x:Name="WaveCaption" Visibility="Collapsed" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource PilotSecondary}" />
+                <UniformGrid x:Name="WaveSegments" Rows="1" Height="23" />
               </StackPanel>
             </Grid>
           </Border>
-          <Grid Margin="4,22,4,22">
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition />
-              <ColumnDefinition Width="1" />
-              <ColumnDefinition />
-            </Grid.ColumnDefinitions>
-            <StackPanel>
-              <TextBlock Text="Session time" FontSize="11" Foreground="{DynamicResource PilotSecondary}" />
-              <TextBlock x:Name="ElapsedText" Text="00:00:00" FontFamily="Bahnschrift, Segoe UI" FontSize="28" Margin="0,6,0,0" />
-            </StackPanel>
-            <Border Grid.Column="1" Background="{DynamicResource PilotBorder}" Margin="0,3,0,3" />
-            <StackPanel Grid.Column="2" Margin="26,0,0,0">
-              <TextBlock Text="Completed runs" FontSize="11" Foreground="{DynamicResource PilotSecondary}" />
-              <TextBlock x:Name="CompletedText" Text="0" FontFamily="Bahnschrift, Segoe UI" FontSize="28" Margin="0,6,0,0" />
-            </StackPanel>
-          </Grid>
-          <ComboBox x:Name="EarningsView" SelectedIndex="0" Height="34" Margin="0,0,0,10" SelectionChanged="EarningsViewChanged" AutomationProperties.Name="Reward totals view">
+          <ComboBox x:Name="EarningsView" SelectedIndex="0" Height="34" Margin="0,22,0,10" SelectionChanged="EarningsViewChanged" AutomationProperties.Name="Reward totals view">
             <ComboBoxItem Content="This session" />
             <ComboBoxItem Content="Latest mission" />
             <ComboBoxItem Content="Lifetime earnings" />
@@ -123,24 +106,11 @@
               <ui:NumberBox x:Name="AttemptInput" Value="1" Minimum="1" Maximum="100" MaxDecimalPlaces="0" AcceptsExpression="False" Height="38" AutomationProperties.Name="Attempt limit" />
             </StackPanel>
           </Grid>
-          <TextBlock x:Name="AttemptSummary" Text="Stops automatically at your limit." FontSize="11" Margin="0,9,0,0" Foreground="{DynamicResource PilotMuted}" />
         </StackPanel>
       </ScrollViewer>
       <Border x:Name="RunControls" Grid.Row="1" Padding="28,16,28,18" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource PilotBorder}" Background="{DynamicResource PilotBackground}">
         <StackPanel>
           <TextBlock x:Name="StatusDetail" Visibility="Collapsed" />
-          <Grid Margin="0,0,0,9">
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="Auto" />
-              <ColumnDefinition />
-              <ColumnDefinition Width="72" />
-              <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <ui:ToggleSwitch x:Name="AutoResumeToggle" VerticalAlignment="Center" AutomationProperties.Name="Automatically resume in Fortnite" />
-            <TextBlock Grid.Column="1" Text="Auto resume after idle" FontSize="12" VerticalAlignment="Center" Margin="8,0,8,0" />
-            <ui:NumberBox x:Name="AutoResumeSecondsInput" Grid.Column="2" Value="10" Minimum="2" Maximum="600" MaxDecimalPlaces="0" AcceptsExpression="False" Height="32" AutomationProperties.Name="Auto resume idle seconds" />
-            <TextBlock Grid.Column="3" Text="sec" FontSize="12" VerticalAlignment="Center" Margin="6,0,0,0" />
-          </Grid>
           <ui:Button x:Name="ResumeButton" Content="Resume in Fortnite" Visibility="Collapsed" HorizontalAlignment="Stretch" Height="38" Margin="0,0,0,8" Click="ResumeClicked" AutomationProperties.Name="Resume in Fortnite" />
           <ui:Button x:Name="PrimaryButton" Appearance="Primary" CornerRadius="10" Height="54" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Click="PrimaryClicked" AutomationProperties.Name="Start endurance">
             <Grid Margin="6,0">
