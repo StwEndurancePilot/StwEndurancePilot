@@ -121,7 +121,8 @@ internal static class InteractionScenarios
             Label("Storm Shield", 700, 30, 180), Label("Loading...", 1500, 600));
         check("Backpack tabs take priority over an item loading label", recognizer.Recognize(backpack).Kind == ScreenKind.Backpack);
         plan = NavigationPlanner.Decide(backpack, recognizer.Recognize(backpack), profile).Plan;
-        check("Backpack targets only the Storm Shield tab", plan is { Step: NavigationStep.SelectStormShieldTab, Key: null } && plan.Target.X == 700);
+        check("Backpack targets the fixed Storm Shield tab", plan is { Step: NavigationStep.SelectStormShieldTab, Key: null }
+            && plan.Target == MenuGeometry.Target(NavigationStep.SelectStormShieldTab, backpack));
         controller.Observe(backpack, recognizer.Recognize(backpack));
         check("An active run prevents backpack navigation", controller.Observe(backpack with { CapturedAt = epoch.AddSeconds(16) }, recognizer.Recognize(backpack)) is null);
         var misaligned = backpack with

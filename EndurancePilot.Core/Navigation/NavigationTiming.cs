@@ -21,7 +21,7 @@ public static class NavigationTiming
     public static bool IsFastStep(NavigationStep? step) => step is NavigationStep.EnterSaveTheWorld or NavigationStep.OpenMap
         or NavigationStep.ChangeZone or NavigationStep.EnterZone or NavigationStep.SelectHomebase or NavigationStep.OpenHomebase
         or NavigationStep.SelectOwnHomebase or NavigationStep.LaunchHomebase or NavigationStep.LaunchLoadedHomebase
-        or NavigationStep.SelectEndurance or NavigationStep.DisableAssistance or NavigationStep.SelectSaveTheWorld
+        or NavigationStep.SelectEndurance or NavigationStep.DisableAssistance or NavigationStep.EnableAssistance or NavigationStep.SelectSaveTheWorld
         or NavigationStep.OpenQuestMenu or NavigationStep.OpenStormShieldConsole or NavigationStep.OpenBackpack or NavigationStep.SelectStormShieldTab
         or NavigationStep.OpenDiscover or NavigationStep.FilterByEpic or NavigationStep.SearchSaveTheWorld or NavigationStep.ConfirmSaveTheWorld;
 

@@ -9,6 +9,7 @@ public sealed partial class MainForm
 {
     private readonly InteractionPause interactionPause = new();
     private DateTimeOffset confirmedHubAt;
+    private DateTimeOffset confirmedSleepAt;
     internal bool InputPaused => runner.IsRunning && interactionPause.Active;
     private void WaitForUserInput(string reason)
     {
@@ -34,7 +35,7 @@ public sealed partial class MainForm
         interactionPause.Begin();
         timer.Interval = 250;
     }
-    private bool InputReady(GameWindow game, bool resumeHub = false)
+    private bool InputReady(GameWindow game, bool resumeUnattended = false)
     {
         if (!interactionPause.Active)
         {
@@ -53,13 +54,13 @@ public sealed partial class MainForm
         }
 
         var lastInput = new LastInput { Size = (uint)Marshal.SizeOf<LastInput>() };
-        if (resumeHub && (!GetLastInputInfo(ref lastInput)
+        if (resumeUnattended && (!GetLastInputInfo(ref lastInput)
             || unchecked((uint)Environment.TickCount - lastInput.Tick) < 10000))
         {
             held = true;
         }
 
-        if (!interactionPause.Ready(DateTimeOffset.UtcNow, game.IsForeground, held || !gotPointer, point.X, point.Y, resumeHub))
+        if (!interactionPause.Ready(DateTimeOffset.UtcNow, game.IsForeground, held || !gotPointer, point.X, point.Y, resumeUnattended))
         {
             timer.Interval = 250;
             return false;

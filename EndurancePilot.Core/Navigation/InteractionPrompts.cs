@@ -40,6 +40,8 @@ public static class InteractionPrompts
     public static bool IsAllowedKeyboardAction(ClickAction action) => QuestMenuEntry.IsFallback(action) || (action.Key, action.Step, action.SourceScreen) switch
     {
         (NavigationKey.C, NavigationStep.ReturnToHomebase, ScreenKind.Victory or ScreenKind.Defeat) => true,
+        (NavigationKey.Escape, NavigationStep.ContinueResults, ScreenKind.Victory or ScreenKind.Defeat) => true,
+        (NavigationKey.C or NavigationKey.Space, NavigationStep.CollectMissionRewards, ScreenKind.Rewards) => true,
         (NavigationKey.E, NavigationStep.OpenStormShieldConsole, ScreenKind.Homebase) => true,
         (NavigationKey.Tab, NavigationStep.OpenQuestMenu, ScreenKind.SaveTheWorldHub) => true,
         (NavigationKey.Tab, NavigationStep.OpenBackpack, ScreenKind.Homebase) => true,

@@ -103,7 +103,7 @@ public sealed class ScreenRecognizer
         {
             return new(ScreenKind.Rewards, ["Received reward with selected card"], NavigationPlanner.MissionRewardControls(frame).ToArray())
             {
-                AllowsInput = NavigationPlanner.MissionRewardControls(frame).Any()
+                AllowsInput = true
             };
         }
 
@@ -152,6 +152,22 @@ public sealed class ScreenRecognizer
                 NavigationPlanner.MissionRewardControls(frame).ToArray());
         }
 
+        if (Has(@"\bCANCEL MATCHMAKING\b") && Has(@"\b(FINDING HOMEBASE SERVER|WAVES SURVIVED|TEAM SCORE)\b"))
+        {
+            return Result(ScreenKind.Matchmaking, "Homebase matchmaking started; Cancel Matchmaking is visible");
+        }
+
+        if (Has(@"\bMATCHMAKE INTO HOMEBASE\b") && Has(@"\b(WAVES SURVIVED|TEAM SCORE|MISSION STATS)\b"))
+        {
+            return Result(Has(@"^DEFEAT$") ? ScreenKind.Defeat : ScreenKind.Victory,
+                "Endurance result with Matchmake into Homebase control", @"\bMATCHMAKE INTO HOMEBASE\b");
+        }
+
+        if (Has(@"\bWAVES SURVIVED\b") && Has(@"^CONTINUE$"))
+        {
+            return Result(ScreenKind.Defeat, "Completed Endurance results with Continue control", @"^CONTINUE$");
+        }
+
         if (Has(@"^VICTORY$") && Has(@"\b(TEAM SCORE|CONTINUE|MISSION STATS|REWARDS)\b"))
         {
             return Result(ScreenKind.Victory, "Victory heading corroborated by result controls", @"\bCONTINUE\b");
@@ -169,7 +185,8 @@ public sealed class ScreenRecognizer
 
         if (StormShieldNavigation.IsConsole(frame))
         {
-            return Result(ScreenKind.StormShieldConsole, "Storm Shield console with endurance, wargames and storage choices", @"^STORM S[HN]IELD ENDURANCE$");
+            return Result(ScreenKind.StormShieldConsole, "Storm Shield menu with a main mission, wargames and storage choices",
+                @"^(STORM S[HN]IELD ENDURANCE|EXPAND STORM S[HN]IELD)$");
         }
 
         if (Has(@"^ENDURANCE$") && Has(@"^POWER LEVEL$") && Has(@"\bDROP YOUR STORM SHIELD AND SURVIVE\b"))

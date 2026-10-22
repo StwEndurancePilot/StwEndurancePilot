@@ -410,6 +410,17 @@ public partial class PilotWindow : FluentWindow
                 return null;
             }
             catch (Exception error) { return error.Message; }
+        }, waitForAssistance =>
+        {
+            try
+            {
+                host.ApplySettings(host.ReadSettings() with
+                {
+                    WaitForAssistance = waitForAssistance
+                });
+                return null;
+            }
+            catch (Exception error) { return error.Message; }
         });
         settingsPane.CheckUpdatesRequested += async (_, _) => await CheckUpdatesAsync();
         settingsPane.OpenUpdateRequested += (_, _) => OpenUpdate();

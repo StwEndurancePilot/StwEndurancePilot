@@ -44,7 +44,9 @@ internal static class GameInput
                 throw new TargetChangedException();
             }
         }
-        if (!QuestMenuEntry.IsFallback(action) && !TargetStillMatches(observedImage, currentImage, action.Target))
+        if (!QuestMenuEntry.IsFallback(action) && !MenuGeometry.UsesFixedTarget(action.Step)
+            && action.Step is not (NavigationStep.CollectMissionRewards or NavigationStep.ReturnToHomebase or NavigationStep.ContinueResults)
+            && !TargetStillMatches(observedImage, currentImage, action.Target))
         {
             throw new TargetChangedException();
         }
@@ -70,6 +72,7 @@ internal static class GameInput
             ushort virtualKey = key switch
             {
                 NavigationKey.C => 0x43,
+                NavigationKey.Space => 0x20,
                 NavigationKey.E => 0x45,
                 NavigationKey.Tab => 0x09,
                 NavigationKey.Escape => 0x1B,
@@ -167,14 +170,6 @@ internal static class GameInput
             throw new UserInteractionException("Target became covered or mouse is in use. No click sent.");
         }
 
-        if (action.Step == NavigationStep.SelectHomebase)
-        {
-            using var settledImage = game.Capture();
-            if (settledImage.Size != currentImage.Size || !new VisualRecognizer().HomebaseTargetStillPresent(settledImage, action.Target))
-            {
-                throw new TargetChangedException();
-            }
-        }
         if (!sessionIsCurrent())
         {
             return false;
@@ -277,7 +272,7 @@ internal static class GameInput
     internal static bool ClearClickedControl(GameWindow game, ClickAction action, Box? destination, Func<bool> sessionIsCurrent)
     {
 
-        if (action.Step is not (NavigationStep.SelectHomebase or NavigationStep.ChangeZone or NavigationStep.DisableAssistance) || destination is not { } target
+        if (action.Step is not (NavigationStep.SelectHomebase or NavigationStep.ChangeZone or NavigationStep.DisableAssistance or NavigationStep.EnableAssistance) || destination is not { } target
                     || !sessionIsCurrent() || !AutomationController.IsValidTarget(target, action.FrameWidth, action.FrameHeight))
         {
             return false;

@@ -26,13 +26,19 @@ public sealed class OcrService
             double overviewScale = Math.Min(1, Math.Min(1920d / source.Width, 1080d / source.Height));
             await ReadCrop(source, new Rectangle(0, 0, source.Width, source.Height), overviewScale, "overview", regions, cancellation);
             var overview = new Observation(capturedAt, source.Width, source.Height, regions);
-            if (overview.Has(MissionRewardReader.RevealHeading) && RewardCardDetector.Find(source) is { } card)
+            var rewardCard = overview.Has(@"^[YV]OU RECEIVED$")
+                ? new VisualRegion("reward-card", new Box(source.Width * .435, source.Height * .41,
+                    source.Width * .13, source.Height * .27), 1, 1)
+                : overview.Has(MissionRewardReader.RevealHeading) ? RewardCardDetector.Find(source) : null;
+            if (rewardCard is { } card)
             {
                 Rectangle Crop(double x, double y, double width, double height) => Rectangle.Intersect(
                     new Rectangle(0, 0, source.Width, source.Height),
                     new Rectangle((int)x, (int)y, Math.Max(1, (int)width), Math.Max(1, (int)height)));
                 var b = card.Bounds;
-                var title = Crop(0, b.Y - b.Height * .3, b.X - b.Width * .1, b.Height * .2);
+                var title = overview.Has(@"^[YV]OU RECEIVED$")
+                    ? Crop(source.Width * .21, source.Height * .33, source.Width * .19, source.Height * .075)
+                    : Crop(0, b.Y - b.Height * .3, b.X - b.Width * .1, b.Height * .2);
                 if (title.Width > 0 && title.Height > 0)
                 {
                     await ReadCrop(source, title, 2, "reward-title", regions, cancellation);
@@ -45,10 +51,18 @@ public sealed class OcrService
                     {
 
                         regions.RemoveAll(r => r.Pass is "reward-count" or "reward-count-check");
-                        var detail = Crop(b.X - b.Width * .1, b.Y - b.Height * .1, b.Width * 1.2, b.Height * 1.2);
-                        await ReadCrop(source, detail, 2, "reward-count", regions, cancellation);
-                        await ReadCrop(source, detail, 1.5, "reward-count-check", regions, cancellation);
+                        var detail = Crop(b.X + b.Width * .6, b.Y + b.Height * .7, b.Width * .4, b.Height * .3);
+                        await ReadCrop(source, detail, 4, "reward-count", regions, cancellation);
+                        await ReadCrop(source, detail, 3, "reward-count-check", regions, cancellation,
+                            TextTreatment.LocalContrast);
                         reveal = new(capturedAt, source.Width, source.Height, regions, [card]);
+                        if (MissionRewardReader.ReadCard(reveal) is null
+                            && RewardCardDetector.ReadRepeatedOnes(source, b) is { } repeated)
+                        {
+                            regions.Add(repeated);
+                            regions.Add(repeated with { Pass = "reward-count-check" });
+                            reveal = new(capturedAt, source.Width, source.Height, regions, [card]);
+                        }
                     }
                     return reveal;
                 }

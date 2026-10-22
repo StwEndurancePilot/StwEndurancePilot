@@ -65,7 +65,7 @@ internal static class SettingsPreview
                 bannerEncoder.Save(file);
             }
 
-            var pane = new SettingsPane(new(), _ => null, _ => null, _ => null, _ => null, _ => null, _ => Task.FromResult("Offline preview"), _ => null);
+            var pane = new SettingsPane(new(), _ => null, _ => null, _ => null, _ => null, _ => null, _ => Task.FromResult("Offline preview"), _ => null, _ => null);
             pane.SetRunning(false);
             pane.SetWebhookStatus("Notifications are off.");
             pane.Measure(new System.Windows.Size(width, 650));

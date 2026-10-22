@@ -35,6 +35,16 @@ internal static class ConsoleChecks
                 await Check(image, $"{capture}-{width}x{height}", expectedStep,
                     new(x + nativeTarget.X * scale, y + nativeTarget.Y * scale, nativeTarget.Width * scale, nativeTarget.Height * scale));
             }
+            if (capture == "twine-endurance-setup-assistance-native")
+            {
+                await Check(original, capture + "-assistance-on", NavigationStep.StartEndurance,
+                    new Box(1090, 950, 380, 70), waitForAssistance: true);
+            }
+            if (capture == "twine-endurance-setup-solo-native")
+            {
+                await Check(original, capture + "-assistance-on", NavigationStep.EnableAssistance,
+                    new Box(1120, 820, 70, 70), waitForAssistance: true);
+            }
             if (expectedStep != NavigationStep.SelectEndurance)
             {
                 using var obscured = new Bitmap(original);
@@ -53,12 +63,16 @@ internal static class ConsoleChecks
             throw new Exception("Console recognition failed: " + string.Join(", ", failures));
         }
 
-        async Task Check(Bitmap image, string name, NavigationStep? expected, Box target)
+        async Task Check(Bitmap image, string name, NavigationStep? expected, Box target, bool waitForAssistance = false)
         {
             var frame = await ocr.ReadAsync(image);
             var screen = new ScreenRecognizer().Recognize(frame);
             frame = visual.Enrich(image, frame, screen.Kind);
-            var plan = NavigationPlanner.Decide(frame, screen, new(HomebaseZone.TwinePeaks, true)).Plan;
+            var plan = NavigationPlanner.Decide(frame, screen, new(HomebaseZone.TwinePeaks, true, WaitForAssistance: waitForAssistance)).Plan;
+            if (expected is { } fixedStep && MenuGeometry.UsesFixedTarget(fixedStep))
+            {
+                target = MenuGeometry.Target(fixedStep, frame);
+            }
             bool passed = expected is null ? plan is null : plan is not null && plan.Step == expected
                 && plan.Target.CenterX >= target.X && plan.Target.CenterX <= target.Right
                 && plan.Target.CenterY >= target.Y && plan.Target.CenterY <= target.Bottom;

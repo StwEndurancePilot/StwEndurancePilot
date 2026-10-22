@@ -11,16 +11,18 @@ public partial class SettingsPane : System.Windows.Controls.UserControl
     private readonly Func<bool, string?> saveIndefinite;
     private readonly Func<int, string?> saveTargetWave;
     private readonly Func<bool, string?> saveEndAtTarget;
+    private readonly Func<bool, string?> saveAssistance;
     private bool savedEndAtTarget;
     private bool? running;
     private bool updating;
     private bool savedLaunch;
     private bool savedManualTheme;
     private bool savedIndefinite;
+    private bool savedAssistance;
 
     internal SettingsPane(RunnerSettings settings, Func<bool, string?> saveLaunch, Func<bool, string?> saveManualTheme, Func<bool, string?> saveIndefinite, Func<int, string?> saveTargetWave,
         Func<WebhookSettings, string?> saveWebhook, Func<WebhookEvent?, Task<string>> testWebhook,
-        Func<bool, string?> saveEndAtTarget)
+        Func<bool, string?> saveEndAtTarget, Func<bool, string?> saveAssistance)
     {
         InitializeComponent();
         SetUpdates(new(UpdateStatus.NotChecked, "Updates are checked when Pilot opens."));
@@ -30,6 +32,10 @@ public partial class SettingsPane : System.Windows.Controls.UserControl
         this.saveIndefinite = saveIndefinite;
         this.saveTargetWave = saveTargetWave;
         this.saveEndAtTarget = saveEndAtTarget;
+        this.saveAssistance = saveAssistance;
+        AssistanceToggle.IsChecked = savedAssistance = settings.WaitForAssistance;
+        AssistanceToggle.Checked += AssistanceChanged;
+        AssistanceToggle.Unchecked += AssistanceChanged;
         EndAtTargetToggle.IsChecked = savedEndAtTarget = settings.EndRunWhenTargetReached;
         EndAtTargetToggle.Checked += EndAtTargetChanged;
         EndAtTargetToggle.Unchecked += EndAtTargetChanged;
@@ -114,6 +120,26 @@ public partial class SettingsPane : System.Windows.Controls.UserControl
             updating = false;
         }
         UpdateTargetHint(savedTargetWave);
+        ShowSaveResult(error);
+    }
+    private void AssistanceChanged(object sender, RoutedEventArgs e)
+    {
+        if (updating || running == true)
+        {
+            return;
+        }
+
+        string? error = saveAssistance(AssistanceToggle.IsChecked == true);
+        if (error is null)
+        {
+            savedAssistance = AssistanceToggle.IsChecked == true;
+        }
+        else
+        {
+            updating = true;
+            AssistanceToggle.IsChecked = savedAssistance;
+            updating = false;
+        }
         ShowSaveResult(error);
     }
     private void UpdateTargetHint(int value) => TargetWaveHint.Text = !savedEndAtTarget

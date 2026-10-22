@@ -45,19 +45,18 @@ internal static class RewardScenarios
             var revealFrame = Reveal(4 + i * .5, "Schematic XP 100");
             revealSession.Observe(revealFrame, recognizer.Recognize(revealFrame));
         }
+        ClickAction? collect = null;
         for (int i = 0; i < 10; i++)
         {
             var revealFrame = Reveal(6 + i * .5, "Gold 50");
-            check("Readable carousel waits for its final stable card " + i,
-                revealSession.Observe(revealFrame, recognizer.Recognize(revealFrame)).Action is null);
+            var rewardAction = revealSession.Observe(revealFrame, recognizer.Recognize(revealFrame)).Action;
+            if (i < 2)
+            {
+                check("Readable carousel confirms its card before advancing " + i, rewardAction is null);
+            }
+            collect ??= rewardAction;
         }
-        ClickAction? collect = null;
-        for (int i = 0; i < 6; i++)
-        {
-            var revealFrame = Reveal(11 + i * .5, "Gold 50");
-            collect ??= revealSession.Observe(revealFrame, recognizer.Recognize(revealFrame)).Action;
-        }
-        check("Completed stable reveal can collect", collect?.Step == NavigationStep.CollectMissionRewards);
+        check("Readable stable reward advances with C", collect is { Step: NavigationStep.CollectMissionRewards, Key: NavigationKey.C });
         check("Corrected quantities are retained without duplicate polling",
             revealSession.Rewards.Items.Single(r => r.Name == "Gold").Quantity == 50
             && revealSession.Rewards.Items.Single(r => r.Name == "Schematic XP").Quantity == 100);

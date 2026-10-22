@@ -6,6 +6,25 @@ internal static class NavigationScenarios
     {
         var recognizer = new ScreenRecognizer();
         var profile = new RunnerProfile(HomebaseZone.TwinePeaks, AfkBaseConfirmed: true);
+        var superUltrawide = new Observation(epoch, 5120, 1400, []);
+        var liveMap = MenuGeometry.Target(NavigationStep.OpenMap, superUltrawide);
+        var liveArrow = MenuGeometry.Target(NavigationStep.ChangeZone, superUltrawide);
+        var liveSelect = MenuGeometry.Target(NavigationStep.EnterZone, superUltrawide);
+        check("5120x1400 Map tab matches live Fortnite position", liveMap.CenterX is > 2020 and < 2140 && liveMap.CenterY is > 115 and < 165);
+        check("5120x1400 zone arrow matches live Fortnite position", liveArrow.CenterX is > 185 and < 230 && liveArrow.CenterY is > 315 and < 370);
+        check("5120x1400 Select matches live Fortnite position", liveSelect.CenterX is > 4690 and < 4830 && liveSelect.CenterY is > 1160 and < 1240);
+        foreach (var (width, height) in new[] { (1920, 1080), (2560, 1440), (3440, 1440), (3840, 1080), (5120, 1400), (5120, 1440) })
+        {
+            var layout = new Observation(epoch, width, height, []);
+            var map = MenuGeometry.Target(NavigationStep.OpenMap, layout);
+            var arrow = MenuGeometry.Target(NavigationStep.ChangeZone, layout);
+            var select = MenuGeometry.Target(NavigationStep.EnterZone, layout);
+            double uiWidth = Math.Min(width, height * 16d / 9);
+            check($"Menu anchors at {width}x{height}",
+                Math.Abs(map.CenterX - (width / 2d - .1875 * uiWidth)) < .01
+                && Math.Abs(arrow.CenterX - .082 * uiWidth) < .01
+                && Math.Abs(select.CenterX - (width - .15 * uiWidth)) < .01);
+        }
         check("Pointer parks beyond the Select letters", NavigationPlanner.PointerRestingPoint(new(800, 700, 200, 30), 1920, 1080) is { X: > 1000 });
         check("Pointer parks left when the anchor touches right edge", NavigationPlanner.PointerRestingPoint(new(1800, 700, 120, 30), 1920, 1080) is { X: < 1800 });
         check("Pointer cannot park outside a fully occupied frame", NavigationPlanner.PointerRestingPoint(new(0, 0, 1920, 1080), 1920, 1080) is null);
@@ -27,6 +46,34 @@ internal static class NavigationScenarios
         }).Kind == ScreenKind.Unknown);
         Observation Frame(int time, params TextRegion[] regions) => new(epoch.AddSeconds(time), 2560, 1440, regions);
         TextRegion Label(string text, double x, double y, double w = 200, double h = 30) => new(text, new(x, y, w, h));
+        var expansionMenu = new Observation(epoch, 1600, 900,
+        [
+            Label("Storm Shield", 492, 25, 125, 16),
+            Label("Loadout", 166, 25, 80, 16),
+            Label("Objectives", 271, 25, 103, 21),
+            Label("Quests", 399, 26, 69, 19),
+            Label("EXPAND STORM SHIELD", 369, 544, 213, 20),
+            Label("DAILY WARGAMES", 716, 410, 168, 20),
+            Label("CUSTOM WARGAMES", 703, 635, 194, 20),
+            Label("STORAGE", 1083, 319, 84, 20),
+            Label("Storm Shield Level 10", 1097, 173, 228, 18)
+        ]);
+        var expansionEvidence = recognizer.Recognize(expansionMenu);
+        var expansionDecision = NavigationPlanner.Decide(expansionMenu, expansionEvidence, profile);
+        check("Expand Storm Shield is recognized as the console, not the backpack",
+            expansionEvidence.Kind == ScreenKind.StormShieldConsole);
+        check("Expansion menu requires attention instead of launching a different mission",
+            expansionDecision.RequiresAttention && expansionDecision.Plan is null
+            && expansionDecision.Detail.Contains("Endurance is unavailable", StringComparison.Ordinal));
+        var assistanceSetup = Frame(0, Label("STORM SHIELD", 300, 130), Label("START ENDURANCE", 700, 700));
+        var uncheckedSetup = assistanceSetup with { Visuals = [new("assistance-unchecked", new(1127, 824, 57, 56), .95, .2)] };
+        var checkedSetup = assistanceSetup with { Visuals = [new("assistance-checked", new(1127, 824, 57, 56), .95, .2)] };
+        var setupEvidence = recognizer.Recognize(assistanceSetup);
+        check("Wait for assistance off starts when unchecked", NavigationPlanner.Decide(uncheckedSetup, setupEvidence, profile).Plan?.Step == NavigationStep.StartEndurance);
+        check("Wait for assistance off clears a checked box", NavigationPlanner.Decide(checkedSetup, setupEvidence, profile).Plan?.Step == NavigationStep.DisableAssistance);
+        var assistedProfile = profile with { WaitForAssistance = true };
+        check("Wait for assistance on checks an unchecked box", NavigationPlanner.Decide(uncheckedSetup, setupEvidence, assistedProfile).Plan?.Step == NavigationStep.EnableAssistance);
+        check("Wait for assistance on starts when checked", NavigationPlanner.Decide(checkedSetup, setupEvidence, assistedProfile).Plan?.Step == NavigationStep.StartEndurance);
         var garbledLoadout = Frame(0, Label("NERPLOADOUT", 76, 449), Label("NERYLOADOUT", 77, 449),
             Label("TWIN PEAKS STORM SIUELD", 162, 245), Label("NERO ABILITIES", 121, 663), Label("EDIT", 330, 855),
             Label("Mission Details", 1841, 1383), Label("Abandon", 2162, 1383),
@@ -96,7 +143,8 @@ internal static class NavigationScenarios
             var current = ZoneFrame(orderedZones[i], i * 2.4);
             var next = orderedZones[i + 1];
             var plan = NavigationPlanner.Decide(current, recognizer.Recognize(current), profile).Plan;
-            check("Forward chevron expects adjacent zone " + next, plan is { Step: NavigationStep.ChangeZone, Target.X: 150 } && plan.Context == next.ToString());
+            check("Forward chevron expects adjacent zone " + next, plan is { Step: NavigationStep.ChangeZone }
+                && plan.Target == MenuGeometry.Target(NavigationStep.ChangeZone, current) && plan.Context == next.ToString());
             check("New zone target needs stable evidence " + next, fast.Observe(current, recognizer.Recognize(current)) is null);
             var stable = current with
             {
@@ -126,7 +174,8 @@ internal static class NavigationScenarios
             {
                 Zone = HomebaseZone.Stonewood
             }).Plan;
-            check("Reverse uses adjacent previous zone " + next, reverse is { Step: NavigationStep.ChangeZone, Target.X: 100 } && reverse.Context == orderedZones[i].ToString());
+            check("Reverse uses adjacent previous zone " + next, reverse is { Step: NavigationStep.ChangeZone }
+                && reverse.Target == MenuGeometry.Target(NavigationStep.ChangeZone, arrived, false) && reverse.Context == orderedZones[i].ToString());
         }
         check("Destination has no extra chevron", NavigationPlanner.NextZoneToward(HomebaseZone.TwinePeaks, HomebaseZone.TwinePeaks) is null);
         check("Unspecified zone has no route", NavigationPlanner.NextZoneToward(HomebaseZone.Unspecified, HomebaseZone.TwinePeaks) is null);
@@ -152,13 +201,15 @@ internal static class NavigationScenarios
             Label("TWINE PEAKS STORM SHIELD", 100, 170), Label("Twine PeakSv", 100, 230), Label("REWARDS", 50, 500), Label("ZOOM", 945, 930));
         check("Homebase map recognised when Select is covered", recognizer.Recognize(titleOnlyZone).Kind == ScreenKind.MissionMap);
         var missingControl = NavigationPlanner.Decide(titleOnlyZone, recognizer.Recognize(titleOnlyZone), profile);
-        check("Full homebase heading proves zone despite noisy subtitle but requires Select", missingControl.Plan is null && !missingControl.RequiresAttention);
+        check("Full homebase heading uses the fixed icon target even when Select is covered",
+            missingControl.Plan?.Step == NavigationStep.SelectHomebase && !missingControl.RequiresAttention);
         var visibleControl = titleOnlyZone with
         {
             Regions = titleOnlyZone.Regions.Append(Label("SELECT", 1500, 870)).ToArray()
         };
         check("Confirmed homebase click enables visible Select", NavigationPlanner.Decide(visibleControl, recognizer.Recognize(visibleControl), profile, homebaseClickConfirmed: true).Plan?.Step == NavigationStep.OpenHomebase);
-        check("Hover title without a located icon cannot skip to Select", NavigationPlanner.Decide(visibleControl, recognizer.Recognize(visibleControl), profile).Plan is null);
+        check("Homebase title still requires the icon click before Select",
+            NavigationPlanner.Decide(visibleControl, recognizer.Recognize(visibleControl), profile).Plan?.Step == NavigationStep.SelectHomebase);
         var hovered = visibleControl with
         {
             Visuals = [new("homebase-icon", new(1000, 500, 60, 60), .98, .4)]
@@ -326,7 +377,8 @@ internal static class NavigationScenarios
                 Label("MY",650,350,40),Label("STORM",700,350,90),Label("SHIELD",800,350,90)}).ToArray()
         };
         var mergedPlan = NavigationPlanner.Decide(mergedOwn, recognizer.Recognize(mergedOwn), profile).Plan;
-        check("Recognised choice dialog can select a row merged with its description", mergedPlan?.Step == NavigationStep.SelectOwnHomebase && mergedPlan.Target.Right == 890);
+        check("Recognised choice dialog uses the fixed own-shield row", mergedPlan?.Step == NavigationStep.SelectOwnHomebase
+            && mergedPlan.Target == MenuGeometry.Target(NavigationStep.SelectOwnHomebase, mergedOwn));
         var mergedSelected = mergedOwn with
         {
             Visuals = checkedOwn.Visuals,

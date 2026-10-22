@@ -24,6 +24,7 @@ public sealed partial class MainForm : Form
     private bool manualDarkTheme = true;
     private int targetWave = 30;
     private bool endRunWhenTargetReached = true;
+    private bool waitForAssistance;
     private readonly NumericUpDown runLimit = new() { Minimum = 1, Maximum = 100, Value = 1, Width = 60 };
     private readonly CheckBox indefinite = new() { Text = "Indefinite", AutoSize = true };
     private SessionProgress runSession => runner.Progress;
@@ -97,6 +98,7 @@ public sealed partial class MainForm : Form
         manualDarkTheme = saved.ManualDarkTheme;
         targetWave = saved.TargetWave;
         endRunWhenTargetReached = saved.EndRunWhenTargetReached;
+        waitForAssistance = saved.WaitForAssistance;
         launchIfMissing.Checked = saved.LaunchIfMissing;
         settings.Controls.Add(zone);
         settings.Controls.Add(new Label { Text = "Attempt limit", AutoSize = true, Padding = new Padding(10, 5, 0, 0) });
@@ -309,13 +311,17 @@ public sealed partial class MainForm : Form
                     bool resumeHub = runnerMode && !controller.FinishRewardsOnly && !controller.RunInProgress
                         && controller.Status is ControllerStatus.Observing or ControllerStatus.AwaitingTransition
                         && DateTimeOffset.UtcNow - confirmedHubAt < TimeSpan.FromSeconds(30);
-                    bool idle = InputReady(game, resumeHub);
+                    bool resumeSleep = runner.IsRunning && runner.Mode != RunnerMode.Observe
+                        && controller.Status is ControllerStatus.Observing or ControllerStatus.AwaitingTransition
+                        && DateTimeOffset.UtcNow - confirmedSleepAt < TimeSpan.FromSeconds(15);
+                    bool resumeUnattended = resumeHub || resumeSleep;
+                    bool idle = InputReady(game, resumeUnattended);
                     controller.InvalidateObservation();
-                    if (idle && resumeHub && game.Activate())
+                    if (idle && resumeUnattended && game.Activate())
                     {
                         interactionPause.Begin();
                         timer.Interval = 250;
-                        status.Text = "Focusing Fortnite · waiting for fresh screen evidence before Tab";
+                        status.Text = "Focusing Fortnite · waiting for fresh screen evidence";
                         return;
                     }
                     timer.Interval = 250;
@@ -463,7 +469,7 @@ public sealed partial class MainForm : Form
         interactionPause.Clear();
         processExits.Reset();
         runner.Start(navigate ? RunnerMode.Runner : recover ? RunnerMode.Recovery : RunnerMode.Observe,
-            new(chosen.Zone, true, chosen.TargetWave, chosen.EndRunWhenTargetReached), chosen.RunIndefinitely ? null : chosen.AttemptLimit, DateTimeOffset.UtcNow);
+            new(chosen.Zone, true, chosen.TargetWave, chosen.EndRunWhenTargetReached, chosen.WaitForAssistance), chosen.RunIndefinitely ? null : chosen.AttemptLimit, DateTimeOffset.UtcNow);
         stoppedAt = null;
         Earnings.StartSession();
         notificationSession = navigate;
@@ -566,8 +572,10 @@ public sealed partial class MainForm : Form
             evidence = recognizer.Recognize(observation);
             confirmedHubAt = evidence.Kind == ScreenKind.SaveTheWorldHub && evidence.AllowsInput
                 ? observation.CapturedAt : default;
-
             observationOnly = game is not null && (observationOnly || !game.IsForeground);
+            confirmedSleepAt = observationOnly && evidence.Kind == ScreenKind.SleepMode && evidence.AllowsInput
+                && NavigationPlanner.Decide(observation, evidence, controller.Profile).Plan is { Step: NavigationStep.KeepPlaying }
+                ? observation.CapturedAt : default;
             double recognitionMilliseconds = recognitionClock.Elapsed.TotalMilliseconds;
             bool refreshDiagnostics = game is null || evidence.Kind != lastScreen || DateTimeOffset.UtcNow >= nextDiagnostics;
             if (refreshDiagnostics)

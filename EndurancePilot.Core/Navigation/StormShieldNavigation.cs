@@ -71,8 +71,11 @@ public static class StormShieldNavigation
         return previous[expected.Length] <= 2;
     }
 
-    public static bool IsConsole(Observation frame) => EnduranceTile(frame) is not null
+    public static bool IsConsole(Observation frame) => (EnduranceTile(frame) is not null || ExpandTile(frame) is not null)
         && new[] { @"^DAIL[YV]\s*WARGAMES$", @"^CUSTOM\s*WARGAMES$", @"^STORAGE$" }.Count(frame.Has) >= 2;
+
+    public static Box? ExpandTile(Observation frame) => AutomationController.UniqueTarget(
+        frame.Find(@"^EXPAND\s*STORM\s*S[HN]IELD$").ToArray());
 
     public static Box? BackpackTab(Observation frame)
     {

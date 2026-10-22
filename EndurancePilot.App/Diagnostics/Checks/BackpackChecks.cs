@@ -43,7 +43,9 @@ internal static class BackpackChecks
                 var screen = new ScreenRecognizer().Recognize(frame);
                 var profile = new RunnerProfile(HomebaseZone.TwinePeaks, true);
                 var plan = NavigationPlanner.Decide(frame, screen, profile).Plan;
-                var expected = new Box(x + target.X * scale, y + target.Y * scale, target.Width * scale, target.Height * scale);
+                var expected = step is { } fixedStep && MenuGeometry.UsesFixedTarget(fixedStep)
+                    ? MenuGeometry.Target(fixedStep, frame)
+                    : new Box(x + target.X * scale, y + target.Y * scale, target.Width * scale, target.Height * scale);
                 bool passed = screen.Kind == kind && plan?.Step == step && plan?.Key == key;
                 if (plan is not null)
                 {

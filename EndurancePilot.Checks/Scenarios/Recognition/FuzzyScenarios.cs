@@ -25,7 +25,9 @@ internal static class FuzzyScenarios
         var console = Frame(Label("Storm Shied Endurance", 300, 500, 300), Label("Daily Wargmes", 800, 300), Label("Storag", 1200, 200));
         evidence = recognizer.Recognize(console);
         check("Several imperfect console labels can authorize the specific menu", evidence is { Kind: ScreenKind.StormShieldConsole, UsesFuzzyMatching: true, AllowsInput: true });
-        check("Console target retains observed position", NavigationPlanner.Decide(console, evidence, profile).Plan is { Step: NavigationStep.SelectEndurance, Target.X: 300 });
+        check("Fuzzy console uses the fixed Endurance tile", NavigationPlanner.Decide(console, evidence, profile).Plan
+            is { Step: NavigationStep.SelectEndurance } consolePlan
+            && consolePlan.Target == MenuGeometry.Target(NavigationStep.SelectEndurance, console));
         var duplicate = console with
         {
             Regions = [.. console.Regions, Label("Storm Shied Endurance", 300, 700, 300)]

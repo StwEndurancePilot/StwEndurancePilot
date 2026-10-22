@@ -9,6 +9,20 @@ static class Program
 
         ApplicationConfiguration.Initialize();
         CompactNativeLibrary.Initialize();
+        if (args.Length == 4 && args[0] == "--verify-end-game")
+        {
+            try
+            {
+                EndGameSequenceChecks.Run(args[1], args[2], args[3]).GetAwaiter().GetResult();
+            }
+            catch (Exception error)
+            {
+                Directory.CreateDirectory(args[3]);
+                File.WriteAllText(Path.Combine(args[3], "error.txt"), error.ToString());
+                Environment.ExitCode = 1;
+            }
+            return;
+        }
         if (args.Length == 3 && args[0] == "--preview-reward-receipts")
         {
             RewardReceiptChecks.Preview(args[1], args[2]).GetAwaiter().GetResult();

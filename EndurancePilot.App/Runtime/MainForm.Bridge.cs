@@ -45,7 +45,7 @@ public sealed partial class MainForm
     }
 
     internal RunnerSettings ReadSettings() => new((HomebaseZone)zone.SelectedItem!, (int)runLimit.Value,
-        launchIfMissing.Checked, indefinite.Checked, manualThemeEnabled, manualDarkTheme, targetWave, webhook, endRunWhenTargetReached);
+        launchIfMissing.Checked, indefinite.Checked, manualThemeEnabled, manualDarkTheme, targetWave, webhook, endRunWhenTargetReached, waitForAssistance);
     internal void ApplySettings(RunnerSettings value)
     {
         if (runner.IsRunning)
@@ -67,6 +67,7 @@ public sealed partial class MainForm
         manualDarkTheme = value.ManualDarkTheme;
         targetWave = value.TargetWave;
         endRunWhenTargetReached = value.EndRunWhenTargetReached;
+        waitForAssistance = value.WaitForAssistance;
         ConfigureWebhook(value.Webhook!);
     }
     internal void ApplyAppearance(bool manual, bool dark)

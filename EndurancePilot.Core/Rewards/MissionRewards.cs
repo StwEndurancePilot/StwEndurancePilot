@@ -43,10 +43,15 @@ public static class MissionRewardReader
         foreach (var (name, icon) in Catalog)
         {
             var label = TextRegion.Normalize(name);
+            bool overviewHasName = lines.Any(r => r.Pass == "overview" && r.Normalized.Contains(label, StringComparison.Ordinal));
             var amounts = new HashSet<long>();
             bool found = false;
             foreach (var line in lines)
             {
+                if (overviewHasName && line.Pass != "overview")
+                {
+                    continue;
+                }
 
                 var text = Regex.Replace(line.Text.ToUpperInvariant(), @"[-!]", " ").Trim();
                 text = Regex.Replace(text, @"\s+", " ");
@@ -127,9 +132,12 @@ public static class MissionRewardReader
         }
 
         var names = frame.Regions.Where(r => r.Pass == "reward-title")
-            .Select(r => r.Text.Trim()).Where(s => Regex.IsMatch(s, @"^[A-Za-z][A-Za-z0-9 '\-!]{2,60}$"))
+            .Select(r => r.Text.Trim()).Where(s => Regex.IsMatch(s, @"^[A-Za-z][A-Za-z0-9 ':,\-!]{2,60}$"))
             .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        if (names.Length != 1)
+        var title = names.FirstOrDefault(n => Catalog.Any(c => TextRegion.Normalize(c.Name) == TextRegion.Normalize(n)))
+            ?? names.FirstOrDefault(n => Regex.IsMatch(n, @"^Endurance\s*:?\s*Wave\s*\d+", RegexOptions.IgnoreCase))
+            ?? (names.Length == 1 ? names[0] : null);
+        if (title is null)
         {
             return null;
         }
@@ -153,10 +161,15 @@ public static class MissionRewardReader
             return null;
         }
 
-        var normalizedName = TextRegion.Normalize(names[0]);
+        if (Regex.IsMatch(title, @"^Endurance\s*:?\s*Wave\s*\d+", RegexOptions.IgnoreCase)
+            && frame.Has(@"\bBATTLE PASS XP EARNED\b"))
+        {
+            return new("Battle Pass XP", quantity, "★");
+        }
+        var normalizedName = TextRegion.Normalize(title);
         var known = Catalog.FirstOrDefault(c => TextRegion.Normalize(c.Name) == normalizedName
             || c.Name.EndsWith(" XP", StringComparison.Ordinal) && TextRegion.Normalize(c.Name[..^1]) == normalizedName);
-        return new(known.Name ?? names[0], quantity, known.Icon ?? "◇");
+        return new(known.Name ?? title, quantity, known.Icon ?? "◇");
     }
 
     public static string Signature(Observation frame, ScreenEvidence screen) =>
@@ -215,6 +228,7 @@ public sealed class MissionRewardTracker
     private string? lastScrollKey;
     private int menuFrames;
     private ScreenKind lastMenu;
+    private DateTimeOffset rewardScreenSince;
 
     public void Reset()
     {
@@ -234,6 +248,7 @@ public sealed class MissionRewardTracker
         CanCollect = false;
         revealSignature = null;
         revealStableSince = default;
+        rewardScreenSince = default;
     }
 
     public void Dispatched(ClickAction action)
@@ -261,6 +276,7 @@ public sealed class MissionRewardTracker
         CanCollect = false;
         if (screen.Kind is not (ScreenKind.Rewards or ScreenKind.RewardClaim))
         {
+            rewardScreenSince = default;
             candidate = null;
             revealSignature = null;
             bool menu = screen.Kind is ScreenKind.SaveTheWorldHub or ScreenKind.SaveTheWorldLobby or ScreenKind.WorldMap
@@ -284,6 +300,10 @@ public sealed class MissionRewardTracker
             return;
         }
         menuFrames = 0;
+        if (rewardScreenSince == default)
+        {
+            rewardScreenSince = frame.CapturedAt;
+        }
         LastSeenAt = frame.CapturedAt;
         Visible = true;
         var visibleItems = MissionRewardReader.Read(frame, screen);
@@ -295,7 +315,8 @@ public sealed class MissionRewardTracker
         }
         CanCollect = visibleItems.Count > 0 && visibleItems.All(r => r.Quantity.HasValue)
             && Items.All(r => r.Quantity.HasValue)
-            && frame.CapturedAt - revealStableSince >= TimeSpan.FromSeconds(5);
+            && frame.CapturedAt - revealStableSince >= TimeSpan.FromMilliseconds(700)
+            || frame.CapturedAt - rewardScreenSince >= TimeSpan.FromSeconds(8);
         if (MissionRewardReader.ReadCard(frame) is { } reward)
         {
 

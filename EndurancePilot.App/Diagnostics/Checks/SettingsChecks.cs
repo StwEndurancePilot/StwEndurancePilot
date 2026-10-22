@@ -14,6 +14,7 @@ internal static class SettingsChecks
             Check("New installations run indefinitely by default", store.Load(out warning).RunIndefinitely);
             Check("Default target is wave 30", store.Load(out warning).TargetWave == 30);
             Check("End at target defaults on", store.Load(out warning).EndRunWhenTargetReached);
+            Check("Wait for assistance defaults off", !store.Load(out warning).WaitForAssistance);
             var saved = new RunnerSettings(EndurancePilot.Core.HomebaseZone.CannyValley, 3, false, false);
             store.Save(saved);
             Check("Preferences survive a new store instance", new SettingsStore(path).Load(out warning) == saved && warning is null);
@@ -55,6 +56,9 @@ internal static class SettingsChecks
             store.Save(saved);
             Check("Disabled target exit persists and remembers the target", new SettingsStore(path).Load(out warning) == saved
                 && saved.TargetWave == 26 && warning is null);
+            saved = saved with { WaitForAssistance = true };
+            store.Save(saved);
+            Check("Wait for assistance survives restart", new SettingsStore(path).Load(out warning) == saved && warning is null);
             var priorContext = SynchronizationContext.Current;
             var host = new MainForm(store);
             try
@@ -108,6 +112,7 @@ internal static class SettingsChecks
             Check("Existing settings default to Windows theme", !legacy.ManualThemeEnabled);
             Check("Existing settings default to target wave 30", legacy.TargetWave == 30);
             Check("Existing settings retain automatic target exit", legacy.EndRunWhenTargetReached);
+            Check("Existing settings retain solo Endurance", !legacy.WaitForAssistance);
             File.WriteAllText(path, "{\"Zone\":\"TwinePeaks\",\"AttemptLimit\":2,\"AfkBaseReady\":false,\"LaunchIfMissing\":true}");
             Check("Removed AFK preference does not invalidate existing settings", store.Load(out warning) == legacy && warning is null);
             File.WriteAllText(path, "broken json");

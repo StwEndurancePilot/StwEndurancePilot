@@ -6,7 +6,7 @@ namespace EndurancePilot.App;
 internal sealed record RunnerSettings(HomebaseZone Zone = HomebaseZone.TwinePeaks, int AttemptLimit = 1,
     bool LaunchIfMissing = true, bool RunIndefinitely = true,
     bool ManualThemeEnabled = false, bool ManualDarkTheme = true, int TargetWave = 30,
-    WebhookSettings? Webhook = null, bool EndRunWhenTargetReached = true)
+    WebhookSettings? Webhook = null, bool EndRunWhenTargetReached = true, bool WaitForAssistance = false)
 {
     public void Validate()
     {

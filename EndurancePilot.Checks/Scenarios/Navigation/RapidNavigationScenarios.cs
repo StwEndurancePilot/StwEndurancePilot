@@ -41,16 +41,18 @@ internal static class RapidNavigationScenarios
         }
         StartTransition();
         Observe(Zone(HomebaseZone.Plankerton, 200));
-        check("Moving next target breaks chained input", Observe(Zone(HomebaseZone.Plankerton, 300, 200)) is null);
-        check("Moved target needs fresh observations", Observe(Zone(HomebaseZone.Plankerton, 400, 200)) is null);
-        check("Moved target can be reacquired", Observe(Zone(HomebaseZone.Plankerton, 500, 200)) is { Target.X: 200 });
+        check("Fixed next-zone target ignores a moved visual anchor",
+            Observe(Zone(HomebaseZone.Plankerton, 300, 200)) is { Step: NavigationStep.ChangeZone } moved
+            && moved.Target == MenuGeometry.Target(NavigationStep.ChangeZone, Zone(HomebaseZone.Plankerton, 300, 200)));
         StartTransition();
         Observe(Zone(HomebaseZone.Plankerton, 200));
         var ambiguous = Zone(HomebaseZone.Plankerton, 300) with
         {
             Visuals = [new("next-zone", new(100, 200, 30, 40), .99, .3), new("next-zone", new(300, 200, 30, 40), .99, .3)]
         };
-        check("Two next targets prevent chaining", Observe(ambiguous) is null);
+        check("Duplicate visual anchors do not change the fixed target",
+            Observe(ambiguous) is { Step: NavigationStep.ChangeZone } duplicate
+            && duplicate.Target == MenuGeometry.Target(NavigationStep.ChangeZone, ambiguous));
         StartTransition();
         Observe(Zone(HomebaseZone.Plankerton, 200));
         check("Resize invalidates pending destination stability", Observe(Zone(HomebaseZone.Plankerton, 300) with { Width = 2560 }) is null && controller.Pending is not null);

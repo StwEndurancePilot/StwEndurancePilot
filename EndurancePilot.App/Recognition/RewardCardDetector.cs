@@ -7,6 +7,52 @@ namespace EndurancePilot.App;
 internal static class RewardCardDetector
 {
 
+    // Windows OCR occasionally drops a row of identical narrow digits (the 1,111 RE-PERK capture).
+    internal static TextRegion? ReadRepeatedOnes(Bitmap image, Box card)
+    {
+        var roi = Rectangle.FromLTRB((int)(card.X + card.Width * .6), (int)(card.Y + card.Height * .7),
+            (int)card.Right, (int)card.Bottom);
+        roi.Intersect(new Rectangle(0, 0, image.Width, image.Height));
+        if (roi.Width < 20 || roi.Height < 20)
+        {
+            return null;
+        }
+
+        using var bitmap = image.Clone(roi, PixelFormat.Format32bppArgb);
+        var pixels = bitmap.LockBits(new Rectangle(System.Drawing.Point.Empty, bitmap.Size), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+        try
+        {
+            using var bgra = Mat.FromPixelData(bitmap.Height, bitmap.Width, MatType.CV_8UC4, pixels.Scan0, pixels.Stride);
+            using var grey = new Mat();
+            using var white = new Mat();
+            Cv2.CvtColor(bgra, grey, ColorConversionCodes.BGRA2GRAY);
+            Cv2.Threshold(grey, white, 225, 255, ThresholdTypes.Binary);
+            Cv2.FindContours(white, out OpenCvSharp.Point[][] contours, out _, RetrievalModes.External, ContourApproximationModes.ApproxSimple);
+            var digits = contours.Select(Cv2.BoundingRect)
+                .Where(b => b.Height > card.Width * .045 && b.Height < card.Width * .09
+                    && b.Width > b.Height * .3 && b.Width < b.Height * .55)
+                .OrderBy(b => b.X).ToArray();
+            if (digits.Length is < 3 or > 6)
+            {
+                return null;
+            }
+
+            double height = digits.Average(d => d.Height);
+            double spacing = digits.Skip(1).Select((d, i) => d.X - digits[i].X).Average();
+            if (digits.Any(d => Math.Abs(d.Height - height) > height * .15
+                || Math.Abs(d.Y - digits[0].Y) > height * .15)
+                || digits.Skip(1).Select((d, i) => d.X - digits[i].X).Any(gap => Math.Abs(gap - spacing) > spacing * .15))
+            {
+                return null;
+            }
+
+            int x = digits[0].X + roi.X, y = digits[0].Y + roi.Y;
+            int right = digits[^1].Right + roi.X, bottom = digits.Max(d => d.Bottom) + roi.Y;
+            return new(new string('1', digits.Length), new Box(x, y, right - x, bottom - y), "reward-count");
+        }
+        finally { bitmap.UnlockBits(pixels); }
+    }
+
     internal static VisualRegion? Find(Bitmap image, List<object>? trace = null)
     {
         using var bitmap = image.Clone(new Rectangle(0, 0, image.Width, image.Height), PixelFormat.Format32bppArgb);

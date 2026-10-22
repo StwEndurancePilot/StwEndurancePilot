@@ -19,7 +19,7 @@ internal static class RouteChecks
             ("live-selected-homebase-1920x1080", NavigationStep.SelectHomebase, (NavigationKey?)null, new Box(925,630,75,75)),
             ("live-discovery-1920x1080", NavigationStep.SelectSaveTheWorld, (NavigationKey?)null, new Box(80,885,260,150)),
             ("live-defeat-matchmake-1920x1080", NavigationStep.ReturnToHomebase, (NavigationKey?)NavigationKey.C, new Box(750,900,420,55)),
-            ("live-people-xp-1920x1080", NavigationStep.CollectMissionRewards, (NavigationKey?)null, new Box(835,1010,220,55)),
+            ("live-people-xp-1920x1080", NavigationStep.CollectMissionRewards, (NavigationKey?)NavigationKey.C, new Box(835,1010,220,55)),
             ("twine-homebase-ready-native", NavigationStep.LaunchLoadedHomebase, (NavigationKey?)null, new Box(1990,1110,365,130)),
             ("homebase-ready-native", NavigationStep.LaunchLoadedHomebase, (NavigationKey?)null, new Box(1990,1110,365,130)),
             ("live-homebase-choice-1918x1030", NavigationStep.LaunchHomebase, (NavigationKey?)null, new Box(1040,884,245,44)),
@@ -49,6 +49,10 @@ internal static class RouteChecks
                 screen = new ScreenRecognizer().Recognize(frame);
                 var plan = NavigationPlanner.Decide(frame, screen, new(HomebaseZone.TwinePeaks, true)).Plan;
                 var expected = new Box(x + nativeTarget.X * scale, y + nativeTarget.Y * scale, nativeTarget.Width * scale, nativeTarget.Height * scale);
+                if (MenuGeometry.UsesFixedTarget(expectedStep))
+                {
+                    expected = MenuGeometry.Target(expectedStep, frame);
+                }
                 bool passed = plan?.Step == expectedStep && plan.Key == expectedKey
                     && plan.Target.CenterX >= expected.X && plan.Target.CenterX <= expected.Right
                     && plan.Target.CenterY >= expected.Y && plan.Target.CenterY <= expected.Bottom;
@@ -105,7 +109,8 @@ internal static class RouteChecks
                 var selectDecision = NavigationPlanner.Decide(frame, screen, new(HomebaseZone.TwinePeaks, true), homebaseClickConfirmed: true);
                 var selectPlan = selectDecision.Plan;
                 bool passed = screen.Kind == ScreenKind.MissionMap && destination is { } box
-                    && selectPlan?.Step == NavigationStep.OpenHomebase && selectPlan.Target == destination
+                    && selectPlan?.Step == NavigationStep.OpenHomebase
+                    && selectPlan.Target == MenuGeometry.Target(NavigationStep.OpenHomebase, frame)
                     && box.CenterX >= x + 1990 * scale && box.CenterX <= x + 2545 * scale
                     && box.CenterY >= y + 1130 * scale && box.CenterY <= y + 1220 * scale;
                 string name = $"homebase-pointer-visible-select-{width}x{height}";

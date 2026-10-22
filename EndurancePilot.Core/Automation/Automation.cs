@@ -183,6 +183,17 @@ public sealed class AutomationController
             return new(null, "Reading rewards; leaving the reveal open until quantities are stable.");
         }
 
+        if (evidence.Kind == ScreenKind.Rewards && attempts == 1
+            && NavigationPlanner.MissionRewardControls(frame).Any(r => r.Normalized == "COLLECT ALL"))
+        {
+            var all = NavigationPlanner.MissionRewardControls(frame).Where(r => r.Normalized == "COLLECT ALL").ToArray();
+            if (UniqueTarget(all) is { } button)
+            {
+                return new(new(NavigationStep.CollectMissionRewards, "Collect remaining rewards after C did not advance",
+                    button, MissionRewardReader.PageContext(frame, evidence), NavigationKey.Space), "Collect remaining rewards");
+            }
+        }
+
         return TargetExitRequested
         && evidence.Kind is not (ScreenKind.RejoinDialog or ScreenKind.SleepMode or ScreenKind.Victory or ScreenKind.Defeat or ScreenKind.Rewards or ScreenKind.RewardClaim or ScreenKind.FeedbackSurvey or ScreenKind.NewUnlock)
         ? TargetWaveExit.Decide(frame, evidence) : NavigationPlanner.Decide(frame, evidence, Profile, HomebaseClickConfirmed);
@@ -590,7 +601,7 @@ public sealed class AutomationController
                     return null;
                 }
 
-                var timeout = pending.Step == NavigationStep.SelectHomebase ? TimeSpan.FromSeconds(2)
+                var timeout = pending.Step is NavigationStep.SelectHomebase or NavigationStep.ReturnToHomebase ? TimeSpan.FromSeconds(2)
                     : pending.Step is NavigationStep.SelectSaveTheWorld or NavigationStep.EnterSaveTheWorld or NavigationStep.LaunchHomebase or NavigationStep.LaunchLoadedHomebase or NavigationStep.StartEndurance or NavigationStep.ReturnToHomebase or NavigationStep.LeaveTargetMission or NavigationStep.ConfirmTargetLeave
                     ? TimeSpan.FromSeconds(90) : TimeSpan.FromSeconds(12);
                 if (frame.CapturedAt - dispatchedAt < timeout)

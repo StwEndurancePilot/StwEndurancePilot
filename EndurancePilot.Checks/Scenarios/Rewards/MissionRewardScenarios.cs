@@ -136,8 +136,10 @@ internal static class MissionRewardScenarios
         var animated = Card(10, "People XP", "35");
         carousel.Observe(animated, recognizer.Recognize(animated), null);
         check("An animated amount updates its card instead of adding intermediate counts", carousel.Items.Single().Quantity == 35);
-        check("Carousel without controls is read-only", !recognizer.Recognize(first).AllowsInput
-            && NavigationPlanner.Decide(first, recognizer.Recognize(first), new()).Plan is null);
+        check("Carousel card without readable controls can advance with C after recording",
+            recognizer.Recognize(first).AllowsInput
+            && NavigationPlanner.Decide(first, recognizer.Recognize(first), new()).Plan
+                is { Step: NavigationStep.CollectMissionRewards, Key: NavigationKey.C });
         for (int i = 1; i <= 20; i++)
         {
             var card = Card(i * 50, "Reward Material " + i, i.ToString());
