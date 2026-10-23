@@ -224,6 +224,7 @@ test('result delivery uses a fixed Discord destination, no redirects, suppressed
   t.mock.method(globalThis, 'fetch', async (url, init) => {
     assert.equal(new URL(url).origin, 'https://discord.com');
     assert.equal(init.redirect, 'error');
+    assert.match(init.headers['User-Agent'], /^DiscordBot \(https:\/\/github\.com\//);
     assert.ok(init.signal);
     const payload = JSON.parse(init.body.get('payload_json'));
     assert.deepEqual(payload.allowed_mentions, { parse: [] });
@@ -235,4 +236,50 @@ test('result delivery uses a fixed Discord destination, no redirects, suppressed
   const state = JSON.stringify(f.instances.get(userA).state());
   assert.equal(state.includes('interaction-secret'), false);
   assert.equal(state.includes('/9j/2Q=='), false);
+});
+
+test('failed Discord delivery preserves a bounded fallback without retaining results or repeating actions', async t => {
+  const f = fixture();
+  const { token } = await f.pair(userA);
+  await f.device(userA, 'poll', token);
+  await f.interaction(userA, 'accounts');
+  const { command } = await (await f.device(userA, 'poll', token)).json();
+  let calls = 0;
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    assert.equal(new URL(url).origin, 'https://discord.com');
+    assert.match(init.headers['User-Agent'], /^DiscordBot /);
+    const payload = JSON.parse(init.body);
+    if (++calls === 1) return new Response('private upstream details', { status: 403 });
+    assert.match(payload.content, /PC handled this command/);
+    assert.equal(payload.content.includes('private account result'), false);
+    return new Response('', { status: 200 });
+  });
+  const response = await f.device(userA, 'result', token, { id: command.id, content: 'private account result' });
+  assert.equal(response.status, 502);
+  assert.deepEqual(await response.json(), { error: 'Discord reply delivery failed', discordStatus: 403 });
+  const entry = f.instances.get(userA);
+  assert.equal(entry.state().pending.resultReceived, true);
+  assert.equal(entry.state().pending.proof, undefined);
+  assert.equal(JSON.stringify(entry.state()).includes('private account result'), false);
+  assert.equal((await (await f.device(userA, 'poll', token)).json()).command, null);
+  assert.equal((await f.device(userA, 'result', token, { id: command.id, content: 'again' })).status, 409);
+  entry.state().pending.expires = Date.now() - 1;
+  await entry.device.alarm();
+  assert.equal(calls, 2);
+  assert.equal(entry.state().pending, undefined);
+  assert.equal(JSON.stringify(entry.state()).includes('interaction-secret'), false);
+});
+
+test('network failure retains the command deadline for a fallback reply', async t => {
+  const f = fixture();
+  const { token } = await f.pair(userA);
+  await f.device(userA, 'poll', token);
+  await f.interaction(userA, 'start');
+  const { command } = await (await f.device(userA, 'poll', token)).json();
+  t.mock.method(globalThis, 'fetch', async () => { throw new Error('sensitive transport detail'); });
+  const response = await f.device(userA, 'result', token, { id: command.id, content: 'done' });
+  assert.equal(response.status, 502);
+  assert.equal((await response.json()).discordStatus, null);
+  assert.equal(f.instances.get(userA).state().pending.expires, command.expires);
+  assert.ok(f.instances.get(userA).alarm());
 });

@@ -13,7 +13,8 @@ const command = { name: 'pilot', description: 'Control your paired Endurance Pil
     type: 1, name, description, ...(name === 'switch' ? { options: [{ type: 4, name: 'account', description: 'Number from /pilot accounts', required: true, min_value: 1, max_value: 100 }] } : {})
   })) };
 const response = await fetch(`https://discord.com/api/v10/applications/${id}/commands`, {
-  method: 'PUT', headers: { Authorization: `Bot ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify([command]),
+  method: 'PUT', headers: { Authorization: `Bot ${token}`, 'Content-Type': 'application/json',
+    'User-Agent': 'DiscordBot (https://github.com/StwEndurancePilot/StwEndurancePilot, 1.0)' }, body: JSON.stringify([command]),
   redirect: 'error', signal: AbortSignal.timeout(15_000)
 });
 if (!response.ok) throw new Error(`Command registration failed (${response.status}).`);

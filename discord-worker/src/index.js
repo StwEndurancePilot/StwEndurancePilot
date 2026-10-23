@@ -152,7 +152,7 @@ export class Device {
     }
     if (path === '/result') {
       const p = state.pending;
-      if (!p || !p.delivered || p.id !== body.id || p.expires < now) return json({ error: 'Expired request' }, 409);
+      if (!p || !p.delivered || p.resultReceived || p.id !== body.id || p.expires < now) return json({ error: 'Expired request' }, 409);
       if (typeof body.content !== 'string' || body.content.length > 1900) return json({ error: 'Invalid response' }, 400);
       let image;
       if (body.image != null) {
@@ -160,9 +160,17 @@ export class Device {
         image = Uint8Array.from(atob(body.image), c => c.charCodeAt(0));
         if (image.length > 2_097_152 || image[0] !== 255 || image[1] !== 216 || image[2] !== 255) return json({ error: 'Invalid image' }, 400);
       }
+      // Keep only the reply handle until delivery succeeds or the existing deadline fires.
+      // Never persist result text/images, and never redeliver the command after a reply failure.
+      p.resultReceived = true;
+      delete p.proof;
+      await this.save(state);
+      try { await this.respond(p, body.content, image); }
+      catch (error) {
+        return json({ error: 'Discord reply delivery failed', discordStatus: error.discordStatus ?? null }, 502);
+      }
       delete state.pending;
       await this.save(state);
-      await this.respond(p, body.content, image);
       return json({ accepted: true });
     }
     return json({ error: 'Not found' }, 404);
@@ -175,17 +183,22 @@ export class Device {
   }
   async respond(p, content, image) {
     const payload = { content, allowed_mentions: { parse: [] }, attachments: [] };
-    let body, headers;
+    let body;
+    const headers = { 'User-Agent': 'DiscordBot (https://github.com/StwEndurancePilot/StwEndurancePilot, 1.0)' };
     if (image) {
       payload.attachments = [{ id: 0, filename: 'game.jpg' }];
       body = new FormData();
       body.set('payload_json', JSON.stringify(payload));
       body.set('files[0]', new Blob([image], { type: 'image/jpeg' }), 'game.jpg');
-    } else { body = JSON.stringify(payload); headers = { 'Content-Type': 'application/json' }; }
+    } else { body = JSON.stringify(payload); headers['Content-Type'] = 'application/json'; }
     // Fixed Discord origin. Device results cannot choose a destination.
     const response = await fetch(`https://discord.com/api/v10/webhooks/${p.application}/${encodeURIComponent(p.replyToken)}/messages/@original`, { method: 'PATCH', body, headers, redirect: 'error', signal: AbortSignal.timeout(8000) });
     await response.body?.cancel();
-    if (!response.ok) throw new Error('Delivery failed');
+    if (!response.ok) {
+      const error = new Error('Delivery failed');
+      error.discordStatus = response.status;
+      throw error;
+    }
   }
   async alarm() {
     return this.ctx.blockConcurrencyWhile(async () => {
@@ -197,7 +210,9 @@ export class Device {
       if (state.pairUntil <= now) { delete state.pairUntil; delete state.pairHash; delete state.attempts; }
       state.seen = state.seen.filter(x => x.until > now);
       await this.save(state);
-      if (expired) await this.respond(expired, 'The PC did not respond in time. Check Pilot before repeating an action.');
+      if (expired) await this.respond(expired, expired.resultReceived
+        ? 'The PC handled this command, but its reply could not be delivered. Check Pilot before repeating an action.'
+        : 'The PC did not respond in time. Check Pilot before repeating an action.');
     });
   }
 }
