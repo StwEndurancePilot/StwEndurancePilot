@@ -9,7 +9,7 @@ internal sealed class TargetChangedException() : InvalidOperationException("Dete
 internal static class GameInput
 {
     public static async Task<bool> DispatchAsync(GameWindow game, Bitmap observedImage, ClickAction action,
-        Func<bool> sessionIsCurrent, CancellationToken cancellation)
+        OcrService ocr, Func<bool> sessionIsCurrent, CancellationToken cancellation)
     {
         if (action.Step == NavigationStep.SearchSaveTheWorld && !DiscoveryNavigation.IsSearchAction(action))
         {
@@ -44,7 +44,15 @@ internal static class GameInput
                 throw new TargetChangedException();
             }
         }
-        if (!QuestMenuEntry.IsFallback(action) && !MenuGeometry.UsesFixedTarget(action.Step)
+        if (action.Step == NavigationStep.ContinueUnlock)
+        {
+            var current = await ocr.ReadAsync(currentImage, cancellation, enhance: false);
+            if (!UnlockTargetStillPresent(current, action))
+            {
+                throw new TargetChangedException();
+            }
+        }
+        else if (!QuestMenuEntry.IsFallback(action) && !MenuGeometry.UsesFixedTarget(action.Step)
             && action.Step is not (NavigationStep.CollectMissionRewards or NavigationStep.ReturnToHomebase or NavigationStep.ContinueResults)
             && !TargetStillMatches(observedImage, currentImage, action.Target))
         {
@@ -353,6 +361,20 @@ internal static class GameInput
         }
 
         return samples > 0 && difference / samples <= 14 && changed / (double)samples <= .15;
+    }
+
+    internal static bool UnlockTargetStillPresent(Observation current, ClickAction action)
+    {
+        if (action.Step != NavigationStep.ContinueUnlock || action.SourceScreen != ScreenKind.NewUnlock
+            || current.Width != action.FrameWidth || current.Height != action.FrameHeight)
+        {
+            return false;
+        }
+
+        var evidence = new ScreenRecognizer().Recognize(current);
+        var plan = NavigationPlanner.Decide(current, evidence, new()).Plan;
+        return plan?.Step == NavigationStep.ContinueUnlock
+            && plan.Target.IntersectionOverUnion(action.Target) > .5;
     }
 
     [StructLayout(LayoutKind.Sequential)]

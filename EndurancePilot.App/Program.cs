@@ -23,6 +23,11 @@ static class Program
             }
             return;
         }
+        if (args.Length == 2 && args[0] == "--verify-unlock")
+        {
+            UnlockChecks.Run(args[1]).GetAwaiter().GetResult();
+            return;
+        }
         if (args.Length == 4 && args[0] == "--verify-end-game")
         {
             try

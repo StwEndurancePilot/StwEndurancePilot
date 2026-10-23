@@ -709,7 +709,7 @@ public sealed partial class MainForm : Form
                     try
                     {
                         var inputClock = System.Diagnostics.Stopwatch.StartNew();
-                        if (!await GameInput.DispatchAsync(game, image, action,
+                        if (!await GameInput.DispatchAsync(game, image, action, ocr!,
                             () => !closed && capturedSession == session, closing.Token))
                         {
                             return;

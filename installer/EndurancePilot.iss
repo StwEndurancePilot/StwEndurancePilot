@@ -80,13 +80,18 @@ end;
 
 function InitializeSetup: Boolean;
 var
-  Existing: String;
+  Existing, InstallLocation: String;
   OldVersion, NewVersion: Int64;
+  HasOldVersion: Boolean;
   ErrorCode: Integer;
 begin
   Result := False;
-  if RegQueryStringValue(HKCU64, UninstallKey, 'DisplayVersion', Existing) and
-     StrToVersion(Existing, OldVersion) and StrToVersion('{#AppVersion}', NewVersion) then
+  HasOldVersion := False;
+  if RegQueryStringValue(HKCU64, UninstallKey, 'InstallLocation', InstallLocation) then
+    HasOldVersion := GetPackedVersion(AddBackslash(InstallLocation) + 'EndurancePilot.exe', OldVersion);
+  if not HasOldVersion and RegQueryStringValue(HKCU64, UninstallKey, 'DisplayVersion', Existing) then
+    HasOldVersion := StrToVersion(Existing, OldVersion);
+  if HasOldVersion and StrToVersion('{#AppVersion}', NewVersion) then
     if ComparePackedVersion(OldVersion, NewVersion) > 0 then
     begin
       SuppressibleMsgBox('A newer version of Endurance Pilot is already installed. Setup will not downgrade it.', mbError, MB_OK, IDOK);
