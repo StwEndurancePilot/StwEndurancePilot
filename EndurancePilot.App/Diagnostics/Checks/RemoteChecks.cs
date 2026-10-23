@@ -32,6 +32,13 @@ internal static class RemoteChecks
         try { DiscordRemote.Validate(configuration.Origin, "../another-user"); }
         catch (InvalidDataException) { invalidUser = true; }
         Check("Discord user ID cannot alter request routing", invalidUser);
+        var publicSettings = new DiscordPublicSettings(configuration.Origin, configuration.ApplicationId, configuration.DiscordPublicKey);
+        Check("Discord build embeds a valid public service identity", DiscordPublicSettings.Load() is not null);
+        Check("Discord accepts valid bundled public identity", DiscordPublicSettings.Parse(publicSettings) is not null);
+        Check("Discord rejects bundled identity without a public key", DiscordPublicSettings.Parse(publicSettings with { PublicKey = "" }) is null);
+        Check("Discord rejects malformed bundled public key", DiscordPublicSettings.Parse(publicSettings with { PublicKey = "not-a-key" }) is null);
+        Check("Discord rejects insecure bundled endpoint", DiscordPublicSettings.Parse(publicSettings with { WorkerOrigin = "http://pilot.example" }) is null);
+        Check("Discord rejects invalid bundled application ID", DiscordPublicSettings.Parse(publicSettings with { ApplicationId = "../user" }) is null);
         return checks;
     }
 }

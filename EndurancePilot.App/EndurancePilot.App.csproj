@@ -22,6 +22,7 @@
     <Description>Save the World endurance runner — early access</Description>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Remote\discord-public.json" LogicalName="EndurancePilot.DiscordPublicSettings" />
     <Resource Include="Branding\Pilot.png" />
     <Resource Include="Branding\Pilot.ico" />
     <Content Include="assets\*.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

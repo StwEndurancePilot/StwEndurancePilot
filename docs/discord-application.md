@@ -30,7 +30,7 @@ The workflow is separate from Windows releases. It pins GitHub actions to commit
 ## Pair and use
 
 1. Run `/pilot pair`. Its private reply contains the Worker origin, your Discord user ID and a random code valid for five minutes.
-2. On your own PC, open Pilot's **Epic account menu → Discord remote control**. Enter those three values, plus the **Discord application ID and public verification key** from the trusted publisher's guide (or your own Discord Developer Portal). Verify the Worker address and pinned Discord identity independently of the Worker.
+2. On your own PC, open Pilot's **Epic account menu → Discord remote control**. Enter your Discord user ID and the one-time pairing code. Official builds include the Worker origin, application ID and verification public key. For another deployment, select **Advanced: use a self-hosted Discord application** and enter those three public settings from a trusted publisher's guide or your own Discord Developer Portal. Verify the identity independently of the Worker.
 3. Choose whether to allow game/account actions and game screenshots. Both permissions default to off. Pairing grants progress, statistics and account display-name access.
 4. Select **Pair this PC**. Pairing survives restarting Pilot and expires after 90 days. To change permissions or renew access, disconnect and pair again. Keep the PC clock synchronized; device requests allow 60 seconds of skew, and desktop commands have a stricter 90-second proof lifetime with at most five seconds of future skew.
 
@@ -55,6 +55,12 @@ The security-audit changes introduce device protocol v2. **Old bearer-token pair
 Epic passwords, authorization codes, device IDs and device secrets are never entered into Discord. The approval URL is sensitive until it expires: approve only your own pairing and never forward that link. `/pilot accounts` reports sign-in completion. Remote account switching does not forcibly close Fortnite or terminate a live mission.
 
 ## Security and privacy boundaries
+
+### Public desktop configuration
+
+`EndurancePilot.App/Remote/discord-public.json` is a tracked, public configuration file containing `WorkerOrigin`, `ApplicationId` and `PublicKey`. These are public connection settings and signature-verification material, not credentials. Never put a Discord bot token, Cloudflare API token, pairing code or device private key in this file.
+
+The file is embedded into the desktop assembly during compilation, including single-file releases. Updating it requires rebuilding and distributing the desktop app. It is not loaded from a loose file beside the executable or downloaded from the Worker. Treat changes to this file as security-sensitive: its integrity determines which Discord application the desktop trusts. Fork operators can edit it before building their own release. Missing or invalid configuration exposes manual setup instead of trusting an unverified default. Existing pairings retain their original identity and permissions until explicitly disconnected and paired again. A saved custom deployment remains visible in advanced settings.
 
 - Every Discord request requires a valid Ed25519 signature, matching application ID and timestamp within five minutes at the Worker. Before executing, the desktop independently verifies the original signed bytes against the **locally pinned Discord public key**, application ID, invoking user, command ID, action and arguments. Proofs must be newer than pairing and no more than 90 seconds old. The Worker cannot invent another user's commands without Discord's signing key or replacing the trusted desktop/configuration.
 - Each Durable Object serializes pairing, command delivery and revocation. Pairing codes contain 128 random bits, expire after five minutes and are consumed once. Guesses are rate-limited at the edge; they do not consume a victim's enrollment allowance. Existing pairings cannot be overwritten without unlinking. Signed unlink remains available when the user's command quota is full.
