@@ -78,6 +78,8 @@ The file is embedded into the desktop assembly during compilation, including sin
 
 ## Development and verification
 
+Miniflare currently pins Undici 7.29.1. The scoped npm override in `discord-worker/package.json` uses patched Undici 7.30.1 for GHSA-4qv8-2p9j-2685 and GHSA-f72v-6w45-q472. Keep the lockfile committed and the CI audit enabled. Remove this override once the selected Cloudflare tooling depends on a patched release itself; do not use `npm audit fix --force` to downgrade Miniflare across incompatible runtime APIs.
+
 Use Node 24. From `discord-worker`, run `npm ci --ignore-scripts`, `npm test`, `npm audit --audit-level=moderate`, and `npx wrangler deploy --dry-run`. Tests cover signature verification, cross-user isolation, pairing expiry and replay, signed-device body/audience binding, command expiry/deduplication, revocation, payload/time limits and a real local Cloudflare runtime with concurrent pairing and polling. A public-only Windows CNG signature fixture verifies interoperability with Web Crypto. The dry run does not deploy.
 
 Build the desktop using `dotnet build EndurancePilot.sln`. A live acceptance check still requires a deployed Discord application and a Windows PC running Fortnite: pair with controls disabled, check progress, confirm screenshot/control denial, re-pair with permission enabled, then exercise screenshot, sign-in, account selection, menu and runner commands. Verify both Discord unlink and desktop disconnect prevent later commands. Test using two Discord users and two PCs before opening a public instance.
