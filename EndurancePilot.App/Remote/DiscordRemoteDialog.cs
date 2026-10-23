@@ -58,9 +58,17 @@ internal sealed class DiscordRemoteDialog : Form
         var pair = new Button { Text = "Pair this PC", Width = 150, Height = 32, Enabled = remote.Configuration is null };
         var disconnect = new Button { Text = "Disconnect and revoke", Width = 200, Height = 32 };
         var status = new Label { Text = remote.Status, Width = 465, Height = 55 };
+        var lastCommand = new Label { Text = remote.LastCommandStatus, Width = 465, Height = 80 };
+        var statusTimer = new System.Windows.Forms.Timer { Interval = 500 };
+        statusTimer.Tick += (_, _) =>
+        {
+            if (remote.Configuration is not null && disconnect.Enabled) status.Text = remote.Status;
+            lastCommand.Text = remote.LastCommandStatus;
+        };
+        statusTimer.Start();
         var dialogLifetime = new CancellationTokenSource();
-        FormClosed += (_, _) => { dialogLifetime.Cancel(); };
-        panel.Controls.Add(pair); panel.Controls.Add(disconnect); panel.Controls.Add(status);
+        FormClosed += (_, _) => { dialogLifetime.Cancel(); statusTimer.Dispose(); };
+        panel.Controls.Add(pair); panel.Controls.Add(disconnect); panel.Controls.Add(status); panel.Controls.Add(lastCommand);
         pair.Click += async (_, _) =>
         {
             pair.Enabled = disconnect.Enabled = advanced.Enabled = false;

@@ -73,6 +73,7 @@ internal static class SettingsChecks
             var host = new MainForm(store);
             try
             {
+                Check("New app host restores all saved runner preferences", host.ReadSettings() == saved with { Webhook = new WebhookSettings() });
                 host.SetAutoResume(true, 17);
                 Check("Auto resume changes without restarting the host", host.ReadSettings() is { AutoResumeFortnite: true, AutoResumeIdleSeconds: 17 }
                     && store.Load(out warning).AutoResumeIdleSeconds == 17);
@@ -131,7 +132,30 @@ internal static class SettingsChecks
             File.WriteAllText(path, "{\"Zone\":\"TwinePeaks\",\"AttemptLimit\":2,\"AfkBaseReady\":false,\"LaunchIfMissing\":true}");
             Check("Removed AFK preference does not invalidate existing settings", store.Load(out warning) == legacy && warning is null);
             File.WriteAllText(path, "broken json");
+            Check("Unreadable settings recover the previous valid save", store.Load(out warning) != new RunnerSettings() && warning is not null);
+            var recovered = store.Load(out _);
+            store.Save(recovered);
+            Check("Recovery restores settings without destroying the valid backup", store.Load(out warning) == recovered && warning is null
+                && File.Exists(path + ".bak") && Directory.GetFiles(output, Path.GetFileName(path) + ".unreadable-*").Length == 1);
+            var future = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+            future["FutureOption"] = "keep across versions";
+            future["Webhook"] ??= new System.Text.Json.Nodes.JsonObject();
+            future["Webhook"]!["FutureNotification"] = true;
+            File.WriteAllText(path, future.ToJsonString());
+            var reopened = new SettingsStore(path);
+            var migrated = reopened.Load(out warning) with { TargetWave = 17 };
+            reopened.Save(migrated);
+            var persisted = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(path))!;
+            Check("Updating settings preserves unknown fields from another release", persisted["FutureOption"]!.GetValue<string>() == "keep across versions"
+                && persisted["Webhook"]!["FutureNotification"]!.GetValue<bool>() && reopened.Load(out warning).TargetWave == 17);
+            File.Delete(path);
+            Check("Missing primary settings recover from backup", new SettingsStore(path).Load(out warning).TargetWave == recovered.TargetWave && warning is not null);
+            File.Delete(path + ".bak");
+            File.WriteAllText(path, "broken json");
             Check("Corrupt preferences recover with a visible warning", store.Load(out warning) == new RunnerSettings() && warning is not null);
+            bool blockedOverwrite = false;
+            try { store.Save(new()); } catch (InvalidDataException) { blockedOverwrite = true; }
+            Check("Fallback defaults cannot overwrite unreadable saved preferences", blockedOverwrite && File.ReadAllText(path) == "broken json");
             File.WriteAllText(path, "{\"AttemptLimit\":0}");
             Check("Invalid preferences cannot enter the UI", store.Load(out warning) == new RunnerSettings() && warning is not null);
             bool rejected = false;
@@ -168,6 +192,8 @@ internal static class SettingsChecks
             {
                 File.Delete(path + ".tmp");
             }
+            if (File.Exists(path + ".bak")) File.Delete(path + ".bak");
+            foreach (var preserved in Directory.GetFiles(output, Path.GetFileName(path) + ".unreadable-*")) File.Delete(preserved);
         }
         return report;
     }

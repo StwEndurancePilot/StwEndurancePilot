@@ -3,16 +3,25 @@ import assert from 'node:assert/strict';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 import { identity, signedHeaders } from './helpers.js';
 
-test('Cloudflare runtime: signed pairing, concurrent claims, isolation and revocation', async () => {
+for (const discordStatus of [200, 302]) test(`Cloudflare runtime: pairing, isolation, reply HTTP ${discordStatus} and revocation`, async () => {
   const keys = await crypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']);
   const publicKey = Buffer.from(await crypto.subtle.exportKey('raw', keys.publicKey)).toString('hex');
   const app = '333333333333333333';
   const user = '111111111111111111';
+  let outboundCalls = 0;
   const mf = new Miniflare(convertV4MiniflareOptions({
     modules: [{ type: 'ESModule', path: 'src/index.js' }, { type: 'ESModule', path: 'src/device-auth.js' }], compatibilityDate: '2026-10-23',
     durableObjects: { DEVICES: { className: 'Device', useSQLite: true } },
     ratelimits: { DEVICE_RATE_LIMIT: { namespace_id: '817294', simple: { limit: 120, period: 60 } } },
-    bindings: { DISCORD_PUBLIC_KEY: publicKey, DISCORD_APPLICATION_ID: app, PUBLIC_ORIGIN: 'https://pilot.example' }
+    bindings: { DISCORD_PUBLIC_KEY: publicKey, DISCORD_APPLICATION_ID: app, PUBLIC_ORIGIN: 'https://pilot.example' },
+    outboundService: async request => {
+      outboundCalls++;
+      assert.equal(new URL(request.url).origin, 'https://discord.com');
+      assert.equal(request.method, 'PATCH');
+      assert.equal((await request.json()).content, 'Runtime reply');
+      return Response.json({ id: 'reply' }, { status: discordStatus,
+        headers: discordStatus === 302 ? { Location: 'https://untrusted.example/' } : {} });
+    }
   }));
   let sequence = 0;
   async function interaction(command, application = app) {
@@ -43,6 +52,13 @@ test('Cloudflare runtime: signed pairing, concurrent claims, isolation and revoc
     const polls = await Promise.all([device('poll', token), device('poll', token)]);
     const commands = await Promise.all(polls.map(r => r.json()));
     assert.equal(commands.filter(r => r.command !== null).length, 1);
+    const command = commands.find(r => r.command !== null).command;
+    const result = await device('result', token, { id: command.id, content: 'Runtime reply' });
+    const resultBody = await result.json();
+    assert.equal(result.status, discordStatus === 200 ? 200 : 502, JSON.stringify(resultBody));
+    if (discordStatus === 302) assert.equal(resultBody.discordStatus, 302);
+    else assert.equal(resultBody.accepted, true);
+    assert.equal(outboundCalls, 1, 'Redirect must not forward tokens or results');
     await interaction('unlink');
     assert.equal((await device('poll', token)).status, 401);
   } finally { await mf.dispose(); }

@@ -90,6 +90,7 @@ public sealed partial class MainForm : Form
         var settings = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(16, 4, 12, 4) };
         zone.Items.AddRange(Enum.GetValues<HomebaseZone>().Where(z => z != HomebaseZone.Unspecified).Cast<object>().ToArray());
         var saved = settingsStore.Load(out var settingsWarning);
+        SettingsWarning = settingsWarning;
         startStopHotkey = saved.StartStopHotkey;
         stopButton.Text = "Stop · " + startStopHotkey;
         webhook = saved.Webhook ?? new();

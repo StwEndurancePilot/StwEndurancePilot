@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using EndurancePilot.Core;
 
 namespace EndurancePilot.App;
@@ -33,24 +34,37 @@ internal sealed record RunnerSettings(HomebaseZone Zone = HomebaseZone.TwinePeak
 internal sealed class SettingsStore(string? path = null)
 {
     public string FilePath { get; } = path ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EndurancePilot", "settings.json");
+    private string BackupPath => FilePath + ".bak";
+    private static RunnerSettings Read(string path)
+    {
+        var settings = JsonSerializer.Deserialize<RunnerSettings>(File.ReadAllText(path), Inspection.Json)
+            ?? throw new InvalidDataException("Settings file is empty.");
+        settings.Validate();
+        return settings;
+    }
+    private static bool ReadError(Exception error) => error is IOException or InvalidDataException or UnauthorizedAccessException or JsonException or ArgumentException;
     public RunnerSettings Load(out string? warning)
     {
         warning = null;
-        if (!File.Exists(FilePath))
+        if (!File.Exists(FilePath) && !File.Exists(BackupPath))
         {
             return new();
         }
 
         try
         {
-            var settings = JsonSerializer.Deserialize<RunnerSettings>(File.ReadAllText(FilePath), Inspection.Json)
-                ?? throw new InvalidDataException("Settings file is empty.");
-            settings.Validate();
-            return settings;
+            return Read(FilePath);
         }
-        catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException or JsonException)
+        catch (Exception error) when (ReadError(error))
         {
-            warning = "Saved settings could not be read. Defaults loaded: " + error.Message;
+            try
+            {
+                var recovered = Read(BackupPath);
+                warning = "Saved settings could not be read. Recovered the previous saved settings from backup.";
+                return recovered;
+            }
+            catch (Exception backupError) when (ReadError(backupError)) { }
+            warning = "Saved settings could not be read. Temporary defaults are shown; the original files are preserved and saving is blocked until they can be recovered.";
             return new();
         }
     }
@@ -58,8 +72,50 @@ internal sealed class SettingsStore(string? path = null)
     {
         settings.Validate();
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(FilePath))!);
-        var temporary = FilePath + ".tmp";
-        File.WriteAllText(temporary, JsonSerializer.Serialize(settings, Inspection.Json));
-        File.Move(temporary, FilePath, overwrite: true);
+        // Preserve fields written by another version, including nested notification options.
+        JsonObject? previous = null;
+        bool validPrimary = false;
+        foreach (var candidate in new[] { FilePath, BackupPath })
+        {
+            if (!File.Exists(candidate)) continue;
+            try
+            {
+                _ = Read(candidate);
+                previous = JsonNode.Parse(File.ReadAllText(candidate))!.AsObject();
+                validPrimary = candidate == FilePath;
+                break;
+            }
+            catch (Exception error) when (ReadError(error)) { }
+        }
+        if (previous is null && (File.Exists(FilePath) || File.Exists(BackupPath)))
+            throw new InvalidDataException("Saved settings could not be read. Existing settings have been preserved; recover settings.json or its .bak file before saving.");
+        var next = JsonSerializer.SerializeToNode(settings, Inspection.Json)!.AsObject();
+        static void Merge(JsonObject destination, JsonObject values)
+        {
+            foreach (var entry in values)
+            {
+                if (entry.Value is JsonObject nested && destination[entry.Key] is JsonObject existing) Merge(existing, nested);
+                else destination[entry.Key] = entry.Value?.DeepClone();
+            }
+        }
+        previous ??= new JsonObject();
+        Merge(previous, next);
+        var temporary = FilePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
+            {
+                JsonSerializer.Serialize(stream, previous, Inspection.Json);
+                stream.Flush(flushToDisk: true);
+            }
+            if (validPrimary) File.Replace(temporary, FilePath, BackupPath);
+            else
+            {
+                // Keep unreadable input for recovery, without replacing the valid backup with it.
+                if (File.Exists(FilePath)) File.Copy(FilePath, FilePath + ".unreadable-" + Guid.NewGuid().ToString("N"));
+                File.Move(temporary, FilePath, overwrite: true);
+            }
+        }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
 }

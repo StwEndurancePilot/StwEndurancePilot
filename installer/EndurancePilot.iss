@@ -110,5 +110,30 @@ begin
   Result := True;
 end;
 
-// No settings, logs, credentials or game files are packaged, modified or removed.
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  DataDir, BackupDir, Name: String;
+  Names: TArrayOfString;
+  I: Integer;
+begin
+  if CurStep <> ssInstall then Exit;
+  // Versioned executables share one per-user data directory. Keep a recovery
+  // snapshot outside the installation directory before replacing the program.
+  DataDir := ExpandConstant('{localappdata}\EndurancePilot');
+  BackupDir := DataDir + '\update-backups\' + '{#AppVersion}-' + GetDateTimeString('yyyymmdd-hhnnss-zzz', '-', ':');
+  Names := ['settings.json', 'settings.json.bak', 'accounts.json', 'earnings.json',
+    'discord-remote.bin', 'discord-remote.bin.replay', 'fortnite-path.txt'];
+  for I := 0 to GetArrayLength(Names) - 1 do
+  begin
+    Name := Names[I];
+    if FileExists(DataDir + '\' + Name) then
+    begin
+      if not ForceDirectories(BackupDir) then RaiseException('Could not create the settings backup. Installation stopped.');
+      if not CopyFile(DataDir + '\' + Name, BackupDir + '\' + Name, True) then
+        RaiseException('Could not back up existing settings. Installation stopped.');
+    end;
+  end;
+end;
+
+// No settings, logs, credentials or game files are packaged, overwritten or removed.
 // In particular, never add an UninstallDelete rule for LocalAppData\EndurancePilot.

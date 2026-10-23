@@ -29,6 +29,7 @@ internal sealed class DiscordRemote : IDisposable
     private Task? loop;
     internal RemoteConfiguration? Configuration { get; private set; }
     internal string Status { get; private set; } = "Disabled";
+    internal string LastCommandStatus { get; private set; } = "No command received this session.";
     internal event Action? ConnectionStopped;
 
     internal DiscordRemote(Func<RemoteCommand, RemoteConfiguration, CancellationToken, Task<RemoteResult>> execute,
@@ -206,9 +207,13 @@ internal sealed class DiscordRemote : IDisposable
                     var command = value.Deserialize<RemoteCommand>(Json)!;
                     var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                     if (!RemoteCommandProof.Verify(command, config, now))
+                    {
+                        LastCommandStatus = "Command rejected: Discord proof did not match this pairing or its time window.";
                         throw new InvalidDataException("Command proof rejected.");
+                    }
                     if (replay.TryAccept(command.Id, now))
                     {
+                        LastCommandStatus = "Command verified; waiting for the desktop action to finish.";
                         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
                         deadline.CancelAfter(TimeSpan.FromMilliseconds(command.Expires - now));
                         RemoteResult result;
@@ -221,9 +226,20 @@ internal sealed class DiscordRemote : IDisposable
                         catch (OperationCanceledException) when (token.IsCancellationRequested) { return; }
                         catch { result = new("Action could not be completed. Check Pilot on your PC."); }
                         token.ThrowIfCancellationRequested();
-                        using var sent = await SendAsync(config, "result", new { id = command.Id, content = result.Content, image = result.Image }, token);
-                        if (!sent.IsSuccessStatusCode) Status = "Reply was not delivered. Check Discord before repeating an action.";
+                        LastCommandStatus = "Desktop action finished; sending reply.";
+                        try
+                        {
+                            using var sent = await SendAsync(config, "result", new { id = command.Id, content = result.Content, image = result.Image }, token);
+                            LastCommandStatus = await DescribeReplyAsync(sent, token);
+                            if (!sent.IsSuccessStatusCode) Status = "Reply was not delivered. Check Discord before repeating an action.";
+                        }
+                        catch
+                        {
+                            LastCommandStatus = "Desktop action finished, but reply delivery timed out or the connection failed. Check Pilot before repeating it.";
+                            throw;
+                        }
                     }
+                    else LastCommandStatus = "Duplicate command rejected; the action was not repeated.";
                 }
                 await Task.Delay(TimeSpan.FromSeconds(3), token);
             }
@@ -236,6 +252,20 @@ internal sealed class DiscordRemote : IDisposable
                 catch (OperationCanceledException) { return; }
             }
         }
+    }
+
+    internal static async Task<string> DescribeReplyAsync(HttpResponseMessage response, CancellationToken token)
+    {
+        if (response.IsSuccessStatusCode) return "Reply accepted by the Worker and delivered to Discord.";
+        string upstream = "";
+        try
+        {
+            using var data = JsonDocument.Parse(await response.Content.ReadAsByteArrayAsync(token));
+            if (data.RootElement.TryGetProperty("discordStatus", out var status) && status.TryGetInt32(out int code) && code is >= 100 and <= 599)
+                upstream = $" Discord HTTP {code}.";
+        }
+        catch (Exception error) when (error is JsonException or InvalidOperationException or FormatException) { }
+        return $"Desktop action finished; reply failed (Worker HTTP {(int)response.StatusCode}).{upstream} Check Pilot before repeating it.";
     }
 
     public void Dispose()

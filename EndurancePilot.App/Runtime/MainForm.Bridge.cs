@@ -7,6 +7,7 @@ internal sealed record PilotSnapshot(bool Running, bool Attention, string Headli
 
 public sealed partial class MainForm
 {
+    internal string? SettingsWarning { get; }
     internal MissionRewardTracker Rewards => runner.Rewards;
     internal RewardEarnings Earnings { get; } = new();
     private string lastRewardReceipt = "";

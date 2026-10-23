@@ -192,7 +192,10 @@ export class Device {
       body.set('files[0]', new Blob([image], { type: 'image/jpeg' }), 'game.jpg');
     } else { body = JSON.stringify(payload); headers['Content-Type'] = 'application/json'; }
     // Fixed Discord origin. Device results cannot choose a destination.
-    const response = await fetch(`https://discord.com/api/v10/webhooks/${p.application}/${encodeURIComponent(p.replyToken)}/messages/@original`, { method: 'PATCH', body, headers, redirect: 'error', signal: AbortSignal.timeout(8000) });
+    // workerd supports manual/follow, not redirect: 'error'. Manual prevents
+    // sending the interaction token or result to a redirected destination;
+    // the non-2xx check below rejects every redirect response.
+    const response = await fetch(`https://discord.com/api/v10/webhooks/${p.application}/${encodeURIComponent(p.replyToken)}/messages/@original`, { method: 'PATCH', body, headers, redirect: 'manual', signal: AbortSignal.timeout(8000) });
     await response.body?.cancel();
     if (!response.ok) {
       const error = new Error('Delivery failed');

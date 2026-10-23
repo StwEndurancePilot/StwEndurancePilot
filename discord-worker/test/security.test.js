@@ -223,7 +223,7 @@ test('result delivery uses a fixed Discord destination, no redirects, suppressed
   const { command } = await (await f.device(userA, 'poll', token)).json();
   t.mock.method(globalThis, 'fetch', async (url, init) => {
     assert.equal(new URL(url).origin, 'https://discord.com');
-    assert.equal(init.redirect, 'error');
+    assert.equal(init.redirect, 'manual');
     assert.match(init.headers['User-Agent'], /^DiscordBot \(https:\/\/github\.com\//);
     assert.ok(init.signal);
     const payload = JSON.parse(init.body.get('payload_json'));

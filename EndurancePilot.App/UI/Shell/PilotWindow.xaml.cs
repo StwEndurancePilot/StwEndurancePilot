@@ -33,6 +33,7 @@ public partial class PilotWindow : FluentWindow
         InitializeComponent();
         Height = Math.Min(690, SystemParameters.WorkArea.Height - 32);
         host = new MainForm();
+        settingsError = host.SettingsWarning;
         host.RunnerToggleRequested += ToggleFromControls;
         host.InputPauseChanged += () => Dispatcher.BeginInvoke(new Action(() =>
         {
@@ -165,6 +166,7 @@ public partial class PilotWindow : FluentWindow
         Headline.Text = s.Headline;
         HeadlineRow.Visibility = string.IsNullOrWhiteSpace(s.Headline) ? Visibility.Collapsed : Visibility.Visible;
         StatusDetail.Text = settingsError ?? s.Detail;
+        StatusDetail.Visibility = settingsError is null ? Visibility.Collapsed : Visibility.Visible;
         StatusDetail.ToolTip = StatusDetail.Text;
         PrimaryButton.ToolTip = StatusDetail.Text;
         WaveNumber.Text = (s.Wave ?? 0).ToString("00");

@@ -16,6 +16,12 @@ Endurance Pilot is a Windows app for running Fortnite **Save the World Storm Shi
 
 Settings also include an idle delay for refocusing Fortnite, a configurable hotkey, and optional Discord webhook notifications.
 
+### Updating without losing preferences
+
+Installed and portable releases use the same `%LOCALAPPDATA%\EndurancePilot` data directory, independent of the executable version. Install updates under the same Windows account. Setup snapshots existing settings, encrypted account files, lifetime earnings and Discord pairing into `update-backups\<version>-<timestamp>` in that directory before replacing the app. It stops if a present data file cannot be backed up. These backups contain private data and should not be uploaded to bug reports.
+
+Settings saves keep a `settings.json.bak` recovery copy and preserve fields introduced by other versions. If the primary file is unreadable, Pilot loads the backup and displays a warning. If neither copy is readable, it preserves both and blocks saves rather than overwriting them with defaults. During recovery, unreadable input is kept as `settings.json.unreadable-<id>`. Backups retain the original Windows-user encryption; copying them to another user does not transfer credentials. Session counters and current wave observations restart when the application closes; saved target wave and lifetime totals persist.
+
 ## Discord remote control
 
 Pilot also includes an opt-in Discord application hosted in its own Cloudflare Worker. Pair your PC from **Epic account menu → Discord remote control** to request progress and statistics, manage accounts, approve Epic sign-in, capture the Fortnite window, show Pilot, and start or stop the runner. Game/account actions and screenshots require separate local permissions. Pilot must remain open on your PC.

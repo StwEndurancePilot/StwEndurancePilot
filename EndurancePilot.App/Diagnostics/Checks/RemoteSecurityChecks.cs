@@ -89,6 +89,13 @@ internal static class RemoteSecurityChecks
         Check("Disconnect key deletion prevents reuse", deleted);
         Check("Sensitive records redact string formatting", !new EpicAccount("id", "name", "private-device", "private-secret").ToString().Contains("private-secret")
             && !command.Proof!.ToString().Contains("test-only-reply-token") && !new RemoteResult("approval-link").ToString().Contains("approval-link"));
+        using (var failure = new HttpResponseMessage(HttpStatusCode.BadGateway) { Content = new StringContent("{\"discordStatus\":403,\"error\":\"private-reply-token\"}") })
+        {
+            string message = await DiscordRemote.DescribeReplyAsync(failure, CancellationToken.None);
+            Check("Reply diagnostics show status codes without upstream secrets", message.Contains("Worker HTTP 502") && message.Contains("Discord HTTP 403") && !message.Contains("private-reply-token"));
+        }
+        using (var failure = new HttpResponseMessage(HttpStatusCode.BadGateway) { Content = new StringContent("{\"discordStatus\":\"private-reply-token\"}") })
+            Check("Reply diagnostics reject untrusted status text", !(await DiscordRemote.DescribeReplyAsync(failure, CancellationToken.None)).Contains("private-reply-token"));
 
         string configurationPath = Path.Combine(directory, "remote-" + Guid.NewGuid().ToString("N") + ".bin");
         var handler = new Handler(() => Command(issued: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
