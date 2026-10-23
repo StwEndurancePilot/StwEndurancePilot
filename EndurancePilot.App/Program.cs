@@ -95,10 +95,30 @@ static class Program
             SettingsPreview.Render(args[1]);
             return;
         }
+        if (args.Length == 2 && args[0] == "--preview-accounts")
+        {
+            AccountsPreview.Render(args[1]);
+            return;
+        }
+        if (args.Length == 2 && args[0] == "--probe-epic-auth")
+        {
+            try
+            {
+                using var auth = new EpicAuthentication();
+                _ = auth.BeginSignInAsync(CancellationToken.None).GetAwaiter().GetResult();
+                File.WriteAllText(args[1], "Epic device sign in is available.");
+            }
+            catch (Exception error)
+            {
+                File.WriteAllText(args[1], error.GetType().Name + ": " + error.Message);
+                Environment.ExitCode = 1;
+            }
+            return;
+        }
         if (args.Length == 2 && args[0] == "--self-check")
         {
             Directory.CreateDirectory(args[1]);
-            var checks = StartupChecks.Run().Concat(SettingsChecks.Run(args[1])).Concat(RewardEarningsChecks.Run(args[1])).Concat(RewardReceiptChecks.Run(args[1])).Concat(WebhookChecks.RunAsync().GetAwaiter().GetResult())
+            var checks = StartupChecks.Run().Concat(SettingsChecks.Run(args[1])).Concat(AccountChecks.Run(args[1])).Concat(EpicAuthenticationChecks.RunAsync().GetAwaiter().GetResult()).Concat(RewardEarningsChecks.Run(args[1])).Concat(RewardReceiptChecks.Run(args[1])).Concat(WebhookChecks.RunAsync().GetAwaiter().GetResult())
                 .Concat(UpdateChecks.RunAsync().GetAwaiter().GetResult())
                 .Concat(KeyPressChecks.RunAsync().GetAwaiter().GetResult()).Concat(WaveNotificationChecks.Run()).ToArray();
             File.WriteAllText(Path.Combine(args[1], "startup-checks.json"), System.Text.Json.JsonSerializer.Serialize(checks, Inspection.Json));

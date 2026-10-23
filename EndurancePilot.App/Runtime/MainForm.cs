@@ -16,6 +16,7 @@ public sealed partial class MainForm : Form
     private RunTracker tracker => runner.Tracker;
     private AutomationController controller => runner.Controller;
     private readonly LaunchSupervisor launcher = new();
+    private bool launchSelectedAccountOnStart;
     private readonly CrashRecovery crashRecovery = new();
     private readonly ProcessExitObserver processExits = new();
     private bool pausedByException;
@@ -279,14 +280,20 @@ public sealed partial class MainForm : Form
                         status.Text = controller.Detail;
                         return;
                     }
-                    var request = launcher.Observe(processes);
-                    if (request is not null && launchIfMissing.Checked)
+                    bool launchOnThisObservation = launchSelectedAccountOnStart;
+                    launchSelectedAccountOnStart = false;
+                    var request = launcher.Observe(processes, launchOnThisObservation);
+                    if (request is not null && (launchIfMissing.Checked || launchOnThisObservation))
                     {
-                        EpicLauncher.Launch();
                         launcher.Dispatched(request, DateTimeOffset.UtcNow);
+                        busy = true;
+                        try { await EpicLauncher.LaunchAsync(closing.Token); }
+                        finally { busy = false; }
                         notifications.Launched();
                         log.Write("game-launch", request);
-                        AddActivity("Launch requested through Epic");
+                        AddActivity(EpicLauncher.Accounts.Selected is { } account
+                            ? $"Launching Fortnite as {account.DisplayName}"
+                            : "Launch requested through Epic");
                     }
                     if (launcher.Status == LaunchStatus.NeedsAttention)
                     {
@@ -304,7 +311,8 @@ public sealed partial class MainForm : Form
                     controller.InvalidateObservation();
                     timer.Interval = 250;
                     status.Text = game is null && runnerMode
-                        ? launchIfMissing.Checked ? launcher.Detail : "Waiting for Fortnite · automatic launch is off"
+                        ? launchIfMissing.Checked || launcher.Status == LaunchStatus.Starting
+                            ? launcher.Detail : "Waiting for Fortnite · automatic relaunch is off"
                         : "Observation paused · select Fortnite to resume";
                     RefreshProgress();
                     return;
@@ -465,6 +473,7 @@ public sealed partial class MainForm : Form
         settingsStore.Save(chosen);
         session++;
         launcher.Stop();
+        launchSelectedAccountOnStart = false;
         nextDiagnostics = default;
         lastInputAt = default;
         clearedPointerFor = null;
@@ -488,10 +497,11 @@ public sealed partial class MainForm : Form
             RunLimit = runSession.AttemptLimit,
             Bounds = game?.ClientBounds
         });
-        if (navigate && chosen.LaunchIfMissing)
+        launchSelectedAccountOnStart = navigate && EpicLauncher.Accounts.Selected is not null;
+        if (navigate && (chosen.LaunchIfMissing || launchSelectedAccountOnStart))
         {
             launcher.Start();
-            crashRecovery.Start();
+            if (chosen.LaunchIfMissing) crashRecovery.Start();
         }
         SetControlsRunning(true);
         AddActivity($"{runner.Mode} started · {chosen.Zone} · {(chosen.RunIndefinitely ? "indefinite" : $"limit {chosen.AttemptLimit}")}");
@@ -514,6 +524,7 @@ public sealed partial class MainForm : Form
         timer.Stop();
         runner.Stop(reason);
         launcher.Stop();
+        launchSelectedAccountOnStart = false;
         crashRecovery.Stop();
         stoppedAt ??= DateTimeOffset.UtcNow;
         SetControlsRunning(false);

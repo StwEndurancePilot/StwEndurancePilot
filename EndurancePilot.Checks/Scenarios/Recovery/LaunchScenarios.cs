@@ -33,5 +33,13 @@ internal static class LaunchScenarios
         check("A stalled startup pauses without killing or relaunching the game", supervisor.Status == LaunchStatus.NeedsAttention);
         supervisor.Stop();
         check("Stopped supervision cannot launch", supervisor.Observe(Snapshot(1000)) is null);
+
+        supervisor.Start();
+        check("Explicit start proposes a launch on the first absent-process reading",
+            supervisor.Observe(Snapshot(1010), launchImmediately: true) is not null);
+        supervisor.Stop();
+        supervisor.Start();
+        check("Explicit start does not duplicate a running game",
+            supervisor.Observe(Snapshot(1020, game: true, window: true), launchImmediately: true) is null);
     }
 }

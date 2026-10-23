@@ -54,7 +54,7 @@ public sealed class LaunchSupervisor
         Detail = "Crash recovery finished; confirming process absence";
     }
 
-    public LaunchRequest? Observe(GameProcessSnapshot snapshot)
+    public LaunchRequest? Observe(GameProcessSnapshot snapshot, bool launchImmediately = false)
     {
         if (Status is LaunchStatus.Stopped or LaunchStatus.NeedsAttention || snapshot.CapturedAt <= lastObservation)
         {
@@ -107,7 +107,7 @@ public sealed class LaunchSupervisor
             absenceReads++;
         }
 
-        if (absenceReads < 2 || snapshot.CapturedAt - absentSince < TimeSpan.FromSeconds(5))
+        if (!launchImmediately && (absenceReads < 2 || snapshot.CapturedAt - absentSince < TimeSpan.FromSeconds(5)))
         {
             Detail = "Confirming that the game process is absent";
             return null;

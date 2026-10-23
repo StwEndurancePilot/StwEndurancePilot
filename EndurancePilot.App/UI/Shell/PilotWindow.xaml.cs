@@ -17,6 +17,7 @@ public partial class PilotWindow : FluentWindow
     private readonly DispatcherTimer refresh = new() { Interval = TimeSpan.FromMilliseconds(500) };
     private Window? activityWindow;
     private SettingsPane? settingsPane;
+    private AccountsPane? accountsPane;
     private bool settingsTransition;
     private System.Windows.Controls.TextBox? activityText;
     private ApplicationTheme theme;
@@ -25,6 +26,7 @@ public partial class PilotWindow : FluentWindow
     private readonly Windows.UI.ViewManagement.UISettings windowsColours = new();
     private string? settingsError;
     private string? rewardLayout;
+    private bool accountPopupWasOpenOnPress;
 
     public PilotWindow()
     {
@@ -43,6 +45,7 @@ public partial class PilotWindow : FluentWindow
             .Select(z => new { Zone = z, Label = z switch { HomebaseZone.TwinePeaks => "Twine Peaks", HomebaseZone.CannyValley => "Canny Valley", _ => z.ToString() } }).ToArray();
         ZoneChoice.SelectedValue = settings.Zone;
         AttemptInput.Value = settings.AttemptLimit;
+        RefreshAccountPicker();
         for (int i = 0; i < 30; i++)
         {
             WaveSegments.Children.Add(new Border { CornerRadius = new CornerRadius(2), Margin = new Thickness(0, 0, i == 29 ? 0 : 4, 0) });
@@ -62,6 +65,7 @@ public partial class PilotWindow : FluentWindow
         Closing += (_, _) =>
         {
             loaded = false;
+            accountsPane?.CancelPending();
             updateLifetime.Cancel();
             windowsColours.ColorValuesChanged -= WindowsColoursChanged;
             ApplicationThemeManager.Changed -= WindowsThemeChanged;
@@ -156,8 +160,7 @@ public partial class PilotWindow : FluentWindow
         AttemptColumn.Width = new GridLength(indefinite ? 0 : 125);
         AttemptFields.Visibility = indefinite ? Visibility.Collapsed : Visibility.Visible;
         Headline.Text = s.Headline;
-        StatusBadge.Text = s.Attention ? "Attention" : s.Running ? "Running" : "Idle";
-        StatusDot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, s.Attention ? "PilotWarning" : s.Running ? "PilotAccent" : "PilotMuted");
+        HeadlineRow.Visibility = string.IsNullOrWhiteSpace(s.Headline) ? Visibility.Collapsed : Visibility.Visible;
         StatusDetail.Text = settingsError ?? s.Detail;
         StatusDetail.ToolTip = StatusDetail.Text;
         PrimaryButton.ToolTip = StatusDetail.Text;
@@ -198,7 +201,7 @@ public partial class PilotWindow : FluentWindow
         }
 
         var layout = $"{EarningsView.SelectedIndex}:{items.Count}:{ResumeButton.Visibility}";
-        if (rewardLayout != layout && settingsPane is null)
+        if (rewardLayout != layout && settingsPane is null && accountsPane is null)
         {
             rewardLayout = layout;
             Dispatcher.BeginInvoke(new Action(FitRewards), DispatcherPriority.Loaded);
@@ -213,7 +216,7 @@ public partial class PilotWindow : FluentWindow
     }
     private void FitRewards()
     {
-        if (!loaded || settingsPane is not null || WindowState != WindowState.Normal)
+        if (!loaded || settingsPane is not null || accountsPane is not null || WindowState != WindowState.Normal)
         {
             return;
         }
@@ -343,9 +346,103 @@ public partial class PilotWindow : FluentWindow
             PrimaryButton.PressedForeground = foreground;
         }
     }
+    private void AccountPickerPressed(object sender, System.Windows.Input.MouseButtonEventArgs e) =>
+        accountPopupWasOpenOnPress = AccountPopup.IsOpen;
+
+    private void AccountPickerClicked(object sender, RoutedEventArgs e)
+    {
+        bool wasOpen = accountPopupWasOpenOnPress || AccountPopup.IsOpen;
+        accountPopupWasOpenOnPress = false;
+        RefreshAccountPicker();
+        AccountPopup.PlacementTarget = AccountPickerButton;
+        AccountPopupPanel.Width = AccountPickerButton.ActualWidth;
+        AccountPopup.IsOpen = !wasOpen;
+    }
+
+    private void RefreshAccountPicker()
+    {
+        var selected = EpicLauncher.Accounts.Selected;
+        AccountName.Text = selected?.DisplayName ?? "Add an account";
+        AccountPickerButton.ToolTip = selected is null ? "Add an Epic account" : $"Switch Epic account · {selected.DisplayName}";
+        AccountMenuItems.Children.Clear();
+        foreach (var account in EpicLauncher.Accounts.All)
+        {
+            var captured = account;
+            AddAccountMenuAction(SymbolRegular.Person24, account.DisplayName, () =>
+            {
+                try
+                {
+                    EpicLauncher.Accounts.Select(captured.AccountId);
+                    RefreshAccountPicker();
+                }
+                catch (Exception error) { System.Windows.MessageBox.Show(this, error.Message, "Epic accounts"); }
+                AccountPopup.IsOpen = false;
+            }, selected?.AccountId == account.AccountId);
+        }
+        if (EpicLauncher.Accounts.All.Count > 0)
+        {
+            AccountMenuItems.Children.Add(new Border { Height = 1, Margin = new Thickness(7, 6, 7, 6), Background = (Brush)FindResource("PilotBorder") });
+            AddAccountMenuAction(SymbolRegular.Play24, "Launch Fortnite", async () =>
+            {
+                AccountPopup.IsOpen = false;
+                try { await EpicLauncher.LaunchAsync(); }
+                catch (Exception error) { System.Windows.MessageBox.Show(this, error.Message, "Fortnite launch"); }
+            });
+            AddAccountMenuAction(SymbolRegular.Settings24, "Manage accounts", () => OpenAccounts(false));
+        }
+        AccountMenuItems.Children.Add(new Border { Height = 1, Margin = new Thickness(7, 6, 7, 6), Background = (Brush)FindResource("PilotBorder") });
+        AddAccountMenuAction(SymbolRegular.Add24, "Add account", () => OpenAccounts(true), highlight: true);
+    }
+
+    private void AddAccountMenuAction(SymbolRegular icon, string label, Action action, bool selected = false, bool highlight = false)
+    {
+        var row = new System.Windows.Controls.Grid();
+        row.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = new GridLength(30) });
+        row.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition());
+        row.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = GridLength.Auto });
+        var symbol = new SymbolIcon { Symbol = icon, FontSize = 17, VerticalAlignment = VerticalAlignment.Center,
+            Foreground = (Brush)FindResource(highlight ? "PilotAccent" : "PilotSecondary") };
+        row.Children.Add(symbol);
+        var text = new System.Windows.Controls.TextBlock { Text = label, FontSize = 12, FontWeight = selected ? FontWeights.SemiBold : FontWeights.Normal,
+            TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center,
+            Foreground = (Brush)FindResource(highlight ? "PilotAccent" : "PilotText") };
+        System.Windows.Controls.Grid.SetColumn(text, 1);
+        row.Children.Add(text);
+        if (selected)
+        {
+            var mark = new System.Windows.Controls.TextBlock { Text = "ACTIVE", FontSize = 9, FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center, Foreground = (Brush)FindResource("PilotAccent") };
+            System.Windows.Controls.Grid.SetColumn(mark, 2);
+            row.Children.Add(mark);
+        }
+        var button = new Wpf.Ui.Controls.Button { Appearance = ControlAppearance.Transparent, Content = row,
+            Height = 40, Padding = new Thickness(12, 0, 12, 0), Margin = new Thickness(0, 1, 0, 1), CornerRadius = new CornerRadius(9),
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch, HorizontalContentAlignment = System.Windows.HorizontalAlignment.Stretch,
+            Background = (Brush)FindResource(selected ? "PilotBackground" : "PilotSurface"),
+            MouseOverBackground = (Brush)FindResource("PilotBackground"),
+            Foreground = (Brush)FindResource("PilotText") };
+        System.Windows.Automation.AutomationProperties.SetName(button, selected ? label + ", selected" : label);
+        button.Click += (_, _) => action();
+        AccountMenuItems.Children.Add(button);
+    }
+
+    private void OpenAccounts(bool add)
+    {
+        AccountPopup.IsOpen = false;
+        if (settingsPane is not null || accountsPane is not null || settingsTransition) return;
+        accountsPane = new AccountsPane(add);
+        accountsPane.BackRequested += (_, _) => ShowMainView();
+        accountsPane.AccountSelectionChanged += (_, _) => RefreshAccountPicker();
+        SettingsHost.Content = accountsPane;
+        SettingsHost.Visibility = Visibility.Visible;
+        MainView.IsEnabled = false;
+        SlideSettings(true);
+    }
+
     private void SettingsClicked(object sender, RoutedEventArgs e)
     {
-        if (settingsPane is not null || settingsTransition)
+        AccountPopup.IsOpen = false;
+        if (settingsPane is not null || accountsPane is not null || settingsTransition)
         {
             return;
         }
@@ -459,7 +556,7 @@ public partial class PilotWindow : FluentWindow
     }
     private void ShowMainView()
     {
-        if (settingsTransition || settingsPane is null)
+        if (settingsTransition || (settingsPane is null && accountsPane is null))
         {
             return;
         }
@@ -486,16 +583,22 @@ public partial class PilotWindow : FluentWindow
             if (opening)
             {
                 MainView.Visibility = Visibility.Collapsed;
-                settingsPane?.FocusBack();
+                if (accountsPane is not null) accountsPane.FocusBack();
+                else settingsPane?.FocusBack();
             }
             else
             {
+                bool leavingAccounts = accountsPane is not null;
+                accountsPane?.CancelPending();
                 SettingsHost.Visibility = Visibility.Collapsed;
                 SettingsHost.Content = null;
                 SettingsHost.IsEnabled = true;
                 settingsPane = null;
+                accountsPane = null;
                 MainView.IsEnabled = true;
-                SettingsButton.Focus();
+                RefreshAccountPicker();
+                if (leavingAccounts) AccountPickerButton.Focus();
+                else SettingsButton.Focus();
             }
         };
         MainSlide.BeginAnimation(TranslateTransform.XProperty, main);

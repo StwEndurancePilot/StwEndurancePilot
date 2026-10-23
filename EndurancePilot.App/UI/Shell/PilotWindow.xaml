@@ -48,16 +48,38 @@
               </ui:Button>
             </StackPanel>
           </Grid>
-          <Grid Margin="1,0,1,14">
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition />
-              <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
+          <Grid Margin="0,0,0,19">
+            <ui:Button x:Name="AccountPickerButton" Appearance="Transparent" Height="52" Padding="11,6" CornerRadius="16"
+                       HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" PreviewMouseLeftButtonDown="AccountPickerPressed" Click="AccountPickerClicked"
+                       Background="{DynamicResource PilotSurface}" Foreground="{DynamicResource PilotText}"
+                       BorderBrush="{DynamicResource PilotBorder}" BorderThickness="1"
+                       AutomationProperties.Name="Switch Epic account">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="35" />
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Border Width="31" Height="31" CornerRadius="16" Background="{DynamicResource PilotBackground}" BorderBrush="{DynamicResource PilotBorder}" BorderThickness="1" VerticalAlignment="Center">
+                  <ui:SymbolIcon Symbol="Person24" FontSize="17" Foreground="{DynamicResource PilotAccent}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="8,0,0,0">
+                  <TextBlock Text="EPIC ACCOUNT" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PilotSecondary}" />
+                  <TextBlock x:Name="AccountName" Text="Add an account" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+                <ui:SymbolIcon Grid.Column="2" Symbol="ChevronDown24" FontSize="16" Foreground="{DynamicResource PilotSecondary}" VerticalAlignment="Center" Margin="12,0,3,0" />
+              </Grid>
+            </ui:Button>
+            <Popup x:Name="AccountPopup" PlacementTarget="{Binding ElementName=AccountPickerButton}" Placement="Bottom" VerticalOffset="5" StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
+              <Border x:Name="AccountPopupPanel" Background="{DynamicResource PilotSurface}" BorderBrush="{DynamicResource PilotBorder}" BorderThickness="1" CornerRadius="14" Padding="6">
+                <ScrollViewer MaxHeight="290" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                  <StackPanel x:Name="AccountMenuItems" />
+                </ScrollViewer>
+              </Border>
+            </Popup>
+          </Grid>
+          <Grid x:Name="HeadlineRow" Margin="1,0,1,14">
             <TextBlock x:Name="Headline" FontSize="14" FontWeight="Medium" VerticalAlignment="Center" />
-            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-              <Ellipse x:Name="StatusDot" Width="6" Height="6" Fill="{DynamicResource PilotMuted}" Margin="0,0,7,0" />
-              <TextBlock x:Name="StatusBadge" Text="Idle" FontSize="11" Foreground="{DynamicResource PilotSecondary}" />
-            </StackPanel>
           </Grid>
           <Border CornerRadius="18" Background="{DynamicResource PilotSurface}" BorderBrush="{DynamicResource PilotBorder}" BorderThickness="1" ClipToBounds="True">
             <Grid>

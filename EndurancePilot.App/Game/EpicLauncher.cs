@@ -6,6 +6,9 @@ namespace EndurancePilot.App;
 internal static class EpicLauncher
 {
     public const string LaunchUri = "com.epicgames.launcher://apps/Fortnite?action=launch&silent=true";
+    public static EpicAccounts Accounts { get; } = new();
+    private static readonly SemaphoreSlim LaunchGate = new(1, 1);
+    private static readonly string PathFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EndurancePilot", "fortnite-path.txt");
 
     public static GameProcessSnapshot Inspect()
     {
@@ -15,16 +18,77 @@ internal static class EpicLauncher
         return new(DateTimeOffset.UtcNow, game, boot, GameWindow.Find() is not null);
     }
 
-    public static void Launch()
+    public static async Task LaunchAsync(CancellationToken token = default)
     {
+        if (!await LaunchGate.WaitAsync(0, token))
+            throw new InvalidOperationException("A Fortnite launch is already in progress.");
+        try
+        {
         var current = Inspect();
         if (current.GamePresent || current.BootstrapperPresent)
         {
             throw new InvalidOperationException("Fortnite is already running or starting. No second launch was sent.");
         }
 
-        Process.Start(new ProcessStartInfo(LaunchUri) { UseShellExecute = true });
+        var account = Accounts.Selected;
+        if (account is null)
+        {
+            Process.Start(new ProcessStartInfo(LaunchUri) { UseShellExecute = true });
+            return;
+        }
+
+        string executable = FindFortniteLauncher() ?? throw new FileNotFoundException(
+            "FortniteLauncher.exe was not found. Check the Fortnite installation in Epic Games Launcher.");
+        using var auth = new EpicAuthentication();
+        string code = await auth.LaunchExchangeCodeAsync(account, token);
+        if (Inspect() is { GamePresent: true } or { BootstrapperPresent: true })
+            throw new InvalidOperationException("Fortnite started while the account was being authenticated. No second launch was sent.");
+        string[] args = ["-AUTH_LOGIN=unused", $"-AUTH_PASSWORD={code}", "-AUTH_TYPE=exchangecode",
+            "-epicapp=Fortnite", "-epicenv=Prod", "-EpicPortal",
+            $"-epicusername={account.DisplayName}", $"-epicuserid={account.AccountId}"];
+        var start = new ProcessStartInfo(executable) { WorkingDirectory = Path.GetDirectoryName(executable)!, UseShellExecute = false };
+        foreach (string arg in args) start.ArgumentList.Add(arg);
+        using var process = Process.Start(start) ?? throw new InvalidOperationException("Windows did not start FortniteLauncher.exe.");
+        }
+        finally { LaunchGate.Release(); }
     }
+
+    public static string? CustomInstallPath => File.Exists(PathFile) ? File.ReadAllText(PathFile).Trim() : null;
+
+    public static void SetInstallPath(string path)
+    {
+        string? executable = ResolveExecutable(path);
+        if (executable is null) throw new FileNotFoundException("Choose a Fortnite folder containing FortniteLauncher.exe.");
+        Directory.CreateDirectory(Path.GetDirectoryName(PathFile)!);
+        File.WriteAllText(PathFile, path);
+    }
+
+    private static string? FindFortniteLauncher()
+    {
+        if (CustomInstallPath is { } chosen && ResolveExecutable(chosen) is { } found) return found;
+        string manifest = @"C:\ProgramData\Epic\UnrealEngineLauncher\LauncherInstalled.dat";
+        if (File.Exists(manifest))
+        {
+            try
+            {
+                using var data = System.Text.Json.JsonDocument.Parse(File.ReadAllText(manifest));
+                foreach (var item in data.RootElement.GetProperty("InstallationList").EnumerateArray())
+                    if (item.TryGetProperty("AppName", out var name) && name.GetString() == "Fortnite" &&
+                        item.TryGetProperty("InstallLocation", out var location) && ResolveExecutable(location.GetString() ?? "") is { } installed)
+                        return installed;
+            }
+            catch (Exception error) when (error is IOException or System.Text.Json.JsonException or KeyNotFoundException or UnauthorizedAccessException) { }
+        }
+        return ResolveExecutable(@"C:\Program Files\Epic Games\Fortnite");
+    }
+
+    private static string? ResolveExecutable(string folder)
+    {
+        string direct = Path.Combine(folder, "FortniteLauncher.exe");
+        string nested = Path.Combine(folder, "FortniteGame", "Binaries", "Win64", "FortniteLauncher.exe");
+        return File.Exists(direct) ? direct : File.Exists(nested) ? nested : null;
+    }
+
 
     private static bool AnyProcess(string name)
     {

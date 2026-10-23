@@ -1,0 +1,176 @@
+<UserControl x:Class="EndurancePilot.App.AccountsPane"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        FontFamily="Segoe UI Variable, Segoe UI"
+        Background="{DynamicResource PilotBackground}" Foreground="{DynamicResource PilotText}"
+        UseLayoutRounding="True" SnapsToDevicePixels="True">
+  <UserControl.Resources>
+    <Style x:Key="FieldLabel" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="Medium" />
+      <Setter Property="Margin" Value="0,12,0,6" />
+    </Style>
+    <Style x:Key="CodeField" TargetType="TextBox">
+      <Setter Property="Height" Value="36" />
+      <Setter Property="Padding" Value="9,6" />
+      <Setter Property="Background" Value="{DynamicResource PilotBackground}" />
+      <Setter Property="Foreground" Value="{DynamicResource PilotText}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource PilotBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+  </UserControl.Resources>
+  <Grid x:Name="ContentRoot" Background="{DynamicResource PilotBackground}">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <Border BorderBrush="{DynamicResource PilotBorder}" BorderThickness="0,0,0,1">
+      <StackPanel Orientation="Horizontal" Margin="24,18,28,10">
+        <ui:Button x:Name="BackButton" Appearance="Transparent" Width="36" Height="36" Padding="0"
+                   Click="BackClicked" ToolTip="Back" AutomationProperties.Name="Back to Pilot">
+          <ui:SymbolIcon Symbol="ArrowLeft24" FontSize="20" />
+        </ui:Button>
+        <TextBlock Text="Epic accounts" FontSize="26" FontWeight="SemiBold" VerticalAlignment="Center" Margin="12,0,0,0" />
+      </StackPanel>
+    </Border>
+    <ScrollViewer x:Name="AccountContent" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Margin="28,20,28,24">
+        <TextBlock Text="Choose who starts Fortnite with Endurance Pilot." FontSize="12"
+                   Foreground="{DynamicResource PilotSecondary}" Margin="0,0,0,20" />
+        <Grid Margin="0,0,0,9">
+          <TextBlock Text="Your accounts" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
+          <TextBlock x:Name="AccountCountText" HorizontalAlignment="Right" VerticalAlignment="Center"
+                     FontSize="11" Foreground="{DynamicResource PilotSecondary}" />
+        </Grid>
+        <Border Background="{DynamicResource PilotSurface}" BorderBrush="{DynamicResource PilotBorder}"
+                BorderThickness="1" CornerRadius="12" Padding="4">
+          <Grid>
+            <StackPanel x:Name="EmptyAccounts" Margin="13,13,13,15">
+              <TextBlock Text="No accounts yet" FontSize="13" FontWeight="SemiBold" />
+              <TextBlock Text="Connect your Epic account to launch with it." FontSize="12" Margin="0,3,0,0"
+                         Foreground="{DynamicResource PilotSecondary}" />
+            </StackPanel>
+            <ListBox x:Name="AccountList" MaxHeight="190" BorderThickness="0" Background="Transparent"
+                     Foreground="{DynamicResource PilotText}" SelectionChanged="AccountChanged"
+                     AutomationProperties.Name="Saved Epic accounts" ScrollViewer.VerticalScrollBarVisibility="Auto">
+              <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                  <Setter Property="Padding" Value="10,8" />
+                  <Setter Property="Margin" Value="0,0,0,2" />
+                  <Setter Property="Background" Value="Transparent" />
+                  <Setter Property="BorderBrush" Value="Transparent" />
+                  <Setter Property="BorderThickness" Value="1" />
+                  <Setter Property="Template">
+                    <Setter.Value>
+                      <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Row" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                          <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                          <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Row" Property="Background" Value="{DynamicResource PilotBackground}" />
+                          </Trigger>
+                          <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Row" Property="Background" Value="{DynamicResource PilotBackground}" />
+                            <Setter TargetName="Row" Property="BorderBrush" Value="{DynamicResource PilotAccent}" />
+                          </Trigger>
+                        </ControlTemplate.Triggers>
+                      </ControlTemplate>
+                    </Setter.Value>
+                  </Setter>
+                </Style>
+              </ListBox.ItemContainerStyle>
+              <ListBox.ItemTemplate>
+                <DataTemplate>
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="36" />
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Border Width="29" Height="29" CornerRadius="15" Background="{DynamicResource PilotBorder}" VerticalAlignment="Center">
+                      <ui:SymbolIcon Symbol="Person24" FontSize="16" Foreground="{DynamicResource PilotText}"
+                                     HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <TextBlock Grid.Column="1" Text="{Binding DisplayName}" FontSize="13" FontWeight="SemiBold"
+                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="2" Text="SELECTED" FontSize="10" FontWeight="SemiBold"
+                               Foreground="{DynamicResource PilotAccent}" VerticalAlignment="Center" Margin="10,0,2,0">
+                      <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                          <Setter Property="Visibility" Value="Collapsed" />
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                              <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </TextBlock.Style>
+                    </TextBlock>
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </Grid>
+        </Border>
+        <ui:Button x:Name="RemoveButton" Appearance="Transparent" Content="Remove selected account" Height="35"
+                   HorizontalAlignment="Right" Margin="0,8,0,0" Visibility="Collapsed"
+                   Click="RemoveClicked" AutomationProperties.Name="Remove selected account" />
+        <Border Height="1" Background="{DynamicResource PilotBorder}" Margin="0,19,0,17" />
+        <TextBlock Text="Add an account" FontSize="15" FontWeight="SemiBold" />
+        <TextBlock Text="Sign in securely on Epic Games; we'll save the account here."
+                   FontSize="12" Foreground="{DynamicResource PilotSecondary}" Margin="0,4,0,11" TextWrapping="Wrap" />
+        <ui:Button x:Name="SignInButton" Appearance="Secondary" Content="Continue with Epic Games" Height="40"
+                   CornerRadius="9" HorizontalAlignment="Stretch" Click="SignInClicked"
+                   AutomationProperties.Name="Sign in with Epic Games" />
+        <ui:Button x:Name="AdvancedToggle" Content="Use a code or device credentials  ↓" Appearance="Transparent"
+                   HorizontalAlignment="Left" Height="34" Margin="-8,6,0,0" Foreground="{DynamicResource PilotSecondary}"
+                   Click="AdvancedClicked" />
+        <Border x:Name="AdvancedPanel" Visibility="Collapsed" Background="{DynamicResource PilotSurface}"
+                BorderBrush="{DynamicResource PilotBorder}" BorderThickness="1" CornerRadius="12" Padding="12" Margin="0,6,0,0">
+          <TabControl Background="Transparent" BorderThickness="0" Foreground="{DynamicResource PilotText}" MinHeight="208">
+            <TabItem Header="Auth code">
+              <StackPanel Margin="4,10,4,2">
+                <TextBlock Text="Get a code from Epic, then paste the authorizationCode value." FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource PilotSecondary}" />
+                <ui:Button Content="Open Epic code page" Appearance="Transparent" HorizontalAlignment="Left" Margin="0,8,0,0" Click="OpenCodePageClicked" />
+                <TextBlock Text="Authorization code" Style="{StaticResource FieldLabel}" />
+                <TextBox x:Name="AuthorizationCode" Style="{StaticResource CodeField}" AutomationProperties.Name="Authorization code" />
+                <ui:Button Content="Add account" HorizontalAlignment="Right" Margin="0,10,0,0" Click="AuthorizationClicked" />
+              </StackPanel>
+            </TabItem>
+            <TabItem Header="Exchange code">
+              <StackPanel Margin="4,10,4,2">
+                <TextBlock Text="Paste a current Epic exchange code." FontSize="12" Foreground="{DynamicResource PilotSecondary}" />
+                <TextBlock Text="Exchange code" Style="{StaticResource FieldLabel}" />
+                <TextBox x:Name="ExchangeCode" Style="{StaticResource CodeField}" AutomationProperties.Name="Exchange code" />
+                <ui:Button Content="Add account" HorizontalAlignment="Right" Margin="0,10,0,0" Click="ExchangeClicked" />
+              </StackPanel>
+            </TabItem>
+            <TabItem Header="Device auth">
+              <StackPanel Margin="4,10,4,2">
+                <TextBlock Text="Use existing device credentials for an account you own." FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource PilotSecondary}" />
+                <TextBlock Text="Account ID" Style="{StaticResource FieldLabel}" />
+                <TextBox x:Name="AccountId" Style="{StaticResource CodeField}" AutomationProperties.Name="Account ID" />
+                <TextBlock Text="Device ID" Style="{StaticResource FieldLabel}" />
+                <TextBox x:Name="DeviceId" Style="{StaticResource CodeField}" AutomationProperties.Name="Device ID" />
+                <TextBlock Text="Secret" Style="{StaticResource FieldLabel}" />
+                <PasswordBox x:Name="DeviceSecret" Height="36" Padding="9,6" Background="{DynamicResource PilotBackground}"
+                             Foreground="{DynamicResource PilotText}" BorderBrush="{DynamicResource PilotBorder}"
+                             BorderThickness="1" AutomationProperties.Name="Device secret" />
+                <ui:Button Content="Add account" HorizontalAlignment="Right" Margin="0,10,0,0" Click="DeviceClicked" />
+              </StackPanel>
+            </TabItem>
+          </TabControl>
+        </Border>
+      </StackPanel>
+    </ScrollViewer>
+    <Border Grid.Row="2" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource PilotBorder}" Padding="24,10">
+      <TextBlock x:Name="StatusText" Text="Your Epic password is entered only on Epic's website." FontSize="11"
+                 TextWrapping="Wrap" Foreground="{DynamicResource PilotSecondary}" AutomationProperties.LiveSetting="Polite" />
+    </Border>
+  </Grid>
+</UserControl>
