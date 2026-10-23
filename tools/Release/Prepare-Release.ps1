@@ -14,7 +14,7 @@ function Invoke-Git {
     return $result
 }
 
-Invoke-Git fetch origin --tags
+Invoke-Git -c credential.helper= -c 'credential.helper=!gh auth git-credential' fetch origin --tags
 $head = Invoke-Git rev-parse HEAD
 if ($head -ne $SourceSha) { throw 'Checkout does not match the triggering push.' }
 if (Invoke-Git status --porcelain --untracked-files=no) { throw 'Tracked files must be clean.' }

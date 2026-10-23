@@ -85,7 +85,7 @@ try {
     $allowedFiles = @(
         'EndurancePilot.App.dll','EndurancePilot.Core.dll','EndurancePilot.App.deps.json','EndurancePilot.App.runtimeconfig.json',
         'Microsoft.Windows.SDK.NET.dll','WinRT.Runtime.dll','OpenCvSharp.dll','OpenCvSharp.WpfExtensions.dll',
-        'Wpf.Ui.dll','Wpf.Ui.Abstractions.dll','OpenCvSharpExtern.dll.br','OpenCvSharpExtern.dll.br.sha256','OpenCvSharpExtern.dll'
+        'Wpf.Ui.dll','Wpf.Ui.Abstractions.dll','BouncyCastle.Cryptography.dll','OpenCvSharpExtern.dll.br','OpenCvSharpExtern.dll.br.sha256','OpenCvSharpExtern.dll'
     )
     $allowedFiles += @(Get-ChildItem -LiteralPath 'EndurancePilot.App/assets' -Filter '*.png' | ForEach-Object { 'assets/' + $_.Name })
     $inventory = @(Get-ChildItem -LiteralPath $bundleDirectory -Recurse -File | ForEach-Object {

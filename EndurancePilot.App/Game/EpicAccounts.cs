@@ -4,7 +4,10 @@ using System.Text.Json;
 
 namespace EndurancePilot.App;
 
-internal sealed record EpicAccount(string AccountId, string DisplayName, string DeviceId, string Secret);
+internal sealed record EpicAccount(string AccountId, string DisplayName, string DeviceId, string Secret)
+{
+    public override string ToString() => "Epic account (credentials redacted)";
+}
 
 internal sealed class EpicAccounts
 {

@@ -24,7 +24,9 @@ $lines = foreach ($file in @($installer, $portable)) {
 }
 [IO.File]::WriteAllLines((Join-Path (Get-Location) $checksums), $lines)
 
-git push origin "refs/tags/$tag"
+# Obtain the short-lived job credential only in this publish step; checkout does
+# not leave a write token in .git/config for build tools or dependency scripts.
+git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push origin "refs/tags/$tag"
 if ($LASTEXITCODE -ne 0) { throw 'Release tag push failed.' }
 
 $headers = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json' }

@@ -3,6 +3,7 @@
     <ProjectReference Include="..\EndurancePilot.Core\EndurancePilot.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.7.0" />
     <PackageReference Include="OpenCvSharp4.Windows.Slim" Version="4.13.0.20260627" />
     <PackageReference Include="WPF-UI" Version="4.3.0" />
   </ItemGroup>

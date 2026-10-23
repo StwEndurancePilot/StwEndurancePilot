@@ -115,11 +115,19 @@ static class Program
             }
             return;
         }
+        if (args.Length == 2 && args[0] == "--check-discord-remote")
+        {
+            var checks = RemoteChecks.Run().Concat(RemoteSecurityChecks.RunAsync(Path.GetDirectoryName(Path.GetFullPath(args[1]))!).GetAwaiter().GetResult()).ToArray();
+            File.WriteAllText(args[1], System.Text.Json.JsonSerializer.Serialize(checks, Inspection.Json));
+            Environment.ExitCode = checks.All(c => c.Passed) ? 0 : 1;
+            return;
+        }
         if (args.Length == 2 && args[0] == "--self-check")
         {
             Directory.CreateDirectory(args[1]);
             var checks = StartupChecks.Run().Concat(SettingsChecks.Run(args[1])).Concat(AccountChecks.Run(args[1])).Concat(EpicAuthenticationChecks.RunAsync().GetAwaiter().GetResult()).Concat(RewardEarningsChecks.Run(args[1])).Concat(RewardReceiptChecks.Run(args[1])).Concat(WebhookChecks.RunAsync().GetAwaiter().GetResult())
-                .Concat(UpdateChecks.RunAsync().GetAwaiter().GetResult())
+                .Concat(UpdateChecks.RunAsync().GetAwaiter().GetResult()).Concat(RemoteChecks.Run())
+                .Concat(RemoteSecurityChecks.RunAsync(args[1]).GetAwaiter().GetResult())
                 .Concat(KeyPressChecks.RunAsync().GetAwaiter().GetResult()).Concat(WaveNotificationChecks.Run()).ToArray();
             File.WriteAllText(Path.Combine(args[1], "startup-checks.json"), System.Text.Json.JsonSerializer.Serialize(checks, Inspection.Json));
             Environment.ExitCode = checks.All(c => c.Passed) ? 0 : 1;

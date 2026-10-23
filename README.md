@@ -16,5 +16,11 @@ Endurance Pilot is a Windows app for running Fortnite **Save the World Storm Shi
 
 Settings also include an idle delay for refocusing Fortnite, a configurable hotkey, and optional Discord webhook notifications.
 
+## Discord remote control
+
+Pilot also includes an opt-in Discord application hosted in its own Cloudflare Worker. Pair your PC from **Epic account menu → Discord remote control** to request progress and statistics, manage accounts, approve Epic sign-in, capture the Fortnite window, show Pilot, and start or stop the runner. Game/account actions and screenshots require separate local permissions. Pilot must remain open on your PC.
+
+See [Discord application setup and security](docs/discord-application.md) for deployment through GitHub environment secrets, pairing, commands, privacy boundaries and self-hosting. The source contains no shared bot or deployment token. The hosted Discord application must be configured and deployed before pairing is available.
+
 Account credentials are encrypted for the current Windows user in `%LOCALAPPDATA%\EndurancePilot\accounts.json`. Signing in uses Epic's website; Endurance Pilot never asks for your Epic password. Account sign in and official game launch follow [Penny Launcher's](https://github.com/ahmed5939/penny-launcher) public implementation, with thanks to its contributors.
 

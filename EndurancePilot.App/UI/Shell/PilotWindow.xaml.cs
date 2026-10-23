@@ -39,6 +39,7 @@ public partial class PilotWindow : FluentWindow
             if (loaded) RefreshState();
         }));
         host.InitializeBridge();
+        InitializeRemote();
         ApplyThemePreference();
         var settings = host.ReadSettings();
         ZoneChoice.ItemsSource = Enum.GetValues<HomebaseZone>().Where(z => z != HomebaseZone.Unspecified)
@@ -67,6 +68,8 @@ public partial class PilotWindow : FluentWindow
             loaded = false;
             accountsPane?.CancelPending();
             updateLifetime.Cancel();
+            remoteLogin?.Cancel();
+            remote?.Dispose();
             windowsColours.ColorValuesChanged -= WindowsColoursChanged;
             ApplicationThemeManager.Changed -= WindowsThemeChanged;
             if (watchingSystemTheme)
@@ -392,6 +395,7 @@ public partial class PilotWindow : FluentWindow
         }
         AccountMenuItems.Children.Add(new Border { Height = 1, Margin = new Thickness(7, 6, 7, 6), Background = (Brush)FindResource("PilotBorder") });
         AddAccountMenuAction(SymbolRegular.Add24, "Add account", () => OpenAccounts(true), highlight: true);
+        AddAccountMenuAction(SymbolRegular.Settings24, "Discord remote control", OpenRemote);
     }
 
     private void AddAccountMenuAction(SymbolRegular icon, string label, Action action, bool selected = false, bool highlight = false)

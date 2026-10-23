@@ -1,0 +1,12 @@
+{
+  "name": "endurance-pilot-discord",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "register": "node scripts/register-commands.js"
+  },
+  "devDependencies": { "miniflare": "5.20261019.2-beta", "wrangler": "4.152.0" }
+}

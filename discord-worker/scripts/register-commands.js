@@ -1,0 +1,20 @@
+const { DISCORD_APPLICATION_ID: id, DISCORD_BOT_TOKEN: token } = process.env;
+if (!/^\d{17,20}$/.test(id ?? '') || !token) throw new Error('Discord registration secrets are missing.');
+const descriptions = {
+  pair: 'Pair your own PC with Discord', unlink: 'Revoke your paired PC',
+  progress: 'Current runner state and wave', statistics: 'Completed runs and lifetime rewards',
+  accounts: 'List saved account numbers', switch: 'Select an account for the next game launch',
+  login: 'Approve a new Epic account on Epic’s website', screenshot: 'Capture only the Fortnite window',
+  menu: 'Show the Pilot window on your PC', start: 'Start endurance using saved settings',
+  stop: 'Stop the runner', launch: 'Launch Fortnite with the selected account'
+};
+const command = { name: 'pilot', description: 'Control your paired Endurance Pilot PC', type: 1,
+  integration_types: [0, 1], contexts: [0, 1, 2], options: Object.entries(descriptions).map(([name, description]) => ({
+    type: 1, name, description, ...(name === 'switch' ? { options: [{ type: 4, name: 'account', description: 'Number from /pilot accounts', required: true, min_value: 1, max_value: 100 }] } : {})
+  })) };
+const response = await fetch(`https://discord.com/api/v10/applications/${id}/commands`, {
+  method: 'PUT', headers: { Authorization: `Bot ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify([command]),
+  redirect: 'error', signal: AbortSignal.timeout(15_000)
+});
+if (!response.ok) throw new Error(`Command registration failed (${response.status}).`);
+console.log('Registered /pilot.');

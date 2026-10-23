@@ -6,7 +6,10 @@ using System.Text.Json;
 
 namespace EndurancePilot.App;
 
-internal sealed record EpicSignIn(Uri VerificationUri, DateTimeOffset ExpiresAt, string DeviceCode, int IntervalSeconds);
+internal sealed record EpicSignIn(Uri VerificationUri, DateTimeOffset ExpiresAt, string DeviceCode, int IntervalSeconds)
+{
+    public override string ToString() => "Epic sign-in (approval details redacted)";
+}
 
 internal sealed class EpicAuthentication : IDisposable
 {
@@ -21,7 +24,7 @@ internal sealed class EpicAuthentication : IDisposable
 
     internal EpicAuthentication(HttpMessageHandler? handler = null)
     {
-        client = handler is null ? new HttpClient() : new HttpClient(handler);
+        client = new HttpClient(handler ?? new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false });
         client.Timeout = TimeSpan.FromSeconds(20);
     }
 

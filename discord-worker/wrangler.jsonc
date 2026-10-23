@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "endurance-pilot-discord",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-23",
+  "workers_dev": true,
+  "observability": { "enabled": false },
+  "ratelimits": [{ "name": "DEVICE_RATE_LIMIT", "namespace_id": "817294", "simple": { "limit": 120, "period": 60 } }],
+  "durable_objects": { "bindings": [{ "name": "DEVICES", "class_name": "Device" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Device"] }]
+}
