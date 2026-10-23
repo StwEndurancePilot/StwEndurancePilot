@@ -46,7 +46,7 @@ public static class InteractionPrompts
         (NavigationKey.Tab, NavigationStep.OpenQuestMenu, ScreenKind.SaveTheWorldHub) => true,
         (NavigationKey.Tab, NavigationStep.OpenBackpack, ScreenKind.Homebase) => true,
         (NavigationKey.Tab, NavigationStep.OpenTargetExitBackpack, ScreenKind.ActiveEndurance) => true,
-        (NavigationKey.Escape, NavigationStep.BackToStormShield, ScreenKind.EnduranceStatus) => true,
+        (NavigationKey.Escape, NavigationStep.BackToStormShield, ScreenKind.EnduranceStatus or ScreenKind.EnduranceRestartRequired) => true,
         _ => false
     };
 }

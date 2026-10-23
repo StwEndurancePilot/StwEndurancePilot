@@ -225,6 +225,43 @@ internal static class TargetWaveScenarios
         }
         Start();
         check("Unrequested leave dialog stays inert", Feed(confirm).Action is null && Feed(confirm).Action is null);
+        var restartRequired = Frame("ENDURANCE", "POWER LEVEL",
+            "Drop your Storm Shield and survive at least 4 waves against a relentless assault!",
+            "Restart Match to Start Endurance");
+        var restartScreen = recognizer.Recognize(restartRequired);
+        check("Restart Match message is not a Start Endurance button",
+            restartScreen.Kind == ScreenKind.EnduranceRestartRequired
+            && NavigationPlanner.Decide(restartRequired, restartScreen, new(HomebaseZone.TwinePeaks, true)).Plan?.Step != NavigationStep.StartEndurance);
+        check("Truncated restart message still requires a new match",
+            recognizer.Recognize(Frame("ENDURANCE", "POWER LEVEL",
+                "Drop your Storm Shield and survive at least 4 waves", "Restart Match to Start Em"))
+                .Kind == ScreenKind.EnduranceRestartRequired);
+        var restartBack = Dispatch(restartRequired, NavigationStep.BackToStormShield);
+        check("Restart requirement uses the verified Escape route",
+            restartBack.Key == NavigationKey.Escape && InteractionPrompts.IsAllowedKeyboardAction(restartBack)
+            && session.Controller.TargetExitRequested);
+        Dispatch(console, NavigationStep.LeaveTargetMission);
+        Dispatch(confirm, NavigationStep.ConfirmTargetLeave);
+        Feed(lobby);
+        Feed(lobby);
+        check("Restart exit is confirmed without inventing a completed run",
+            !session.Controller.TargetExitRequested && session.Progress.AttemptsEnded == 0 && session.IsRunning);
+        Dispatch(lobby, NavigationStep.OpenMap);
+        check("Restart returns to the Homebase launch route", session.IsRunning);
+
+        Start(target: 30);
+        Feed(Frame("Endurance: Wave 10"));
+        Feed(Frame("Endurance: Wave 10"));
+        Dispatch(restartRequired, NavigationStep.BackToStormShield);
+        Dispatch(console, NavigationStep.LeaveTargetMission);
+        Dispatch(confirm, NavigationStep.ConfirmTargetLeave);
+        Feed(lobby);
+        Feed(lobby);
+        check("Restart after an unverified active wave records an interruption once",
+            session.Tracker.Current?.Outcome == RunOutcome.Interrupted && session.Progress.AttemptsEnded == 1
+            && session.Progress.CompletedRuns == 0 && session.IsRunning);
+
+        Start();
         check("Generic Yes/Cancel is not a leave dialog", recognizer.Recognize(confirm with
         {
             Regions = confirm.Regions.Skip(1).ToArray()

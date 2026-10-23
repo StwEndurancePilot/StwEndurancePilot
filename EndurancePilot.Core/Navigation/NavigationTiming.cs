@@ -40,7 +40,7 @@ public static class NavigationTiming
             or ScreenKind.SaveTheWorldLobby or ScreenKind.WorldMap or ScreenKind.MissionMap
             or ScreenKind.HomebaseChoice or ScreenKind.HomebasePreparing or ScreenKind.HomebaseReady
             or ScreenKind.Matchmaking or ScreenKind.Homebase or ScreenKind.Backpack
-            or ScreenKind.StormShieldConsole or ScreenKind.EnduranceSetup or ScreenKind.RejoinDialog
+            or ScreenKind.StormShieldConsole or ScreenKind.EnduranceSetup or ScreenKind.EnduranceRestartRequired or ScreenKind.RejoinDialog
             or ScreenKind.ErrorDialog or ScreenKind.NeedsAttention or ScreenKind.SleepMode or ScreenKind.LeaveConfirmation
             or ScreenKind.FeedbackSurvey or ScreenKind.NewUnlock
         ? MenuPollMilliseconds : GameplayPollMilliseconds;

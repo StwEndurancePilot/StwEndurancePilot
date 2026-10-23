@@ -251,6 +251,7 @@ public sealed class OcrService
                 && AutomationController.UniqueTarget(frame.Find(NavigationPlanner.MissionLaunchLabel).ToArray()) is not null,
             ScreenKind.HomebaseReady => AutomationController.UniqueTarget(frame.Find(NavigationPlanner.MissionLaunchLabel).ToArray()) is not null,
             ScreenKind.Homebase => StormShieldNavigation.InactiveObjective(frame) is not null,
+            ScreenKind.EnduranceRestartRequired => true,
             ScreenKind.StormShieldConsole => StormShieldNavigation.IsConsole(frame) && (!requireExitControls || TargetWaveExit.LeaveControl(frame) is not null),
             ScreenKind.LeaveConfirmation => AutomationController.UniqueTarget(new ScreenRecognizer().Recognize(frame).Targets) is not null,
             ScreenKind.RejoinDialog => AutomationController.UniqueTarget(RejoinDialog.Recognize(frame)!.Targets) is not null,

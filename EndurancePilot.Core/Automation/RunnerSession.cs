@@ -81,6 +81,11 @@ public sealed class RunnerSession
         int abandonedBefore = Controller.ConfirmedAbandons;
         int dismissedBefore = Controller.ConfirmedDismissals;
         int targetExitsBefore = Controller.ConfirmedTargetExits;
+        if (Mode == RunnerMode.Runner && Progress.Phase == SessionPhase.Running
+            && evidence.Kind == ScreenKind.EnduranceRestartRequired)
+        {
+            Controller.RequestTargetExit("Endurance requires a new match · leaving Storm Shield");
+        }
         if (Mode == RunnerMode.Runner && Controller.Profile.EndRunWhenTargetReached && Controller.Profile.TargetWave < 30 && evidence.Kind == ScreenKind.ActiveEndurance
             && Tracker.Current is { Outcome: RunOutcome.InProgress } run && run.HighestWave > Controller.Profile.TargetWave
             && Tracker.LastConfirmedWaveAt == frame.CapturedAt)
@@ -91,7 +96,8 @@ public sealed class RunnerSession
         var action = Controller.Observe(frame, evidence);
         if (Controller.ConfirmedTargetExits > targetExitsBefore)
         {
-            outcome = Tracker.CompleteTarget(frame.CapturedAt, Controller.Profile.TargetWave);
+            outcome = Tracker.CompleteTarget(frame.CapturedAt, Controller.Profile.TargetWave)
+                ?? Tracker.Interrupt(frame.CapturedAt, "Left the previous Homebase match to restart Endurance");
             if (outcome is not null)
             {
                 Record(outcome);

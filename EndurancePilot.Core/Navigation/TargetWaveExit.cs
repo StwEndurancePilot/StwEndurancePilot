@@ -56,8 +56,10 @@ public static class TargetWaveExit
                 return Plan(NavigationStep.LeaveTargetMission, "Leave Storm Shield after the target wave",
                     LeaveControl(frame));
             case ScreenKind.EnduranceStatus:
+            case ScreenKind.EnduranceRestartRequired:
                 return Plan(NavigationStep.BackToStormShield, "Back to Storm Shield exit controls",
-                    AutomationController.UniqueTarget(frame.Find(@"^ENDURANCE$").ToArray()), NavigationKey.Escape);
+                    AutomationController.UniqueTarget(frame.Find(@"^ENDURANCE$")
+                        .Where(r => !r.Pass.EndsWith("-word", StringComparison.Ordinal)).ToArray()), NavigationKey.Escape);
             case ScreenKind.LeaveConfirmation:
                 return Plan(NavigationStep.ConfirmTargetLeave, "Confirm leaving after the target wave", AutomationController.UniqueTarget(screen.Targets));
             default:

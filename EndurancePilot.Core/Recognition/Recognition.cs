@@ -39,7 +39,7 @@ public enum ScreenKind
     Unknown, ModeSelection, SaveTheWorldLobby, WorldMap, MissionMap, HomebaseChoice, HomebaseReady, Matchmaking,
     Loading, Homebase, EnduranceSetup, ActiveEndurance, Victory, Defeat, Rewards, ErrorDialog, NeedsAttention,
     RewardClaim, ModeDiscovery, EnduranceCountdown, StormShieldConsole, SaveTheWorldHub, Backpack, EnduranceStatus,
-    HomebasePreparing, RejoinDialog, SleepMode, LeaveConfirmation,
+    HomebasePreparing, RejoinDialog, SleepMode, LeaveConfirmation, EnduranceRestartRequired,
     FortniteLobby, FeaturedLobby, DiscoverBrowser, DiscoverResults, SaveTheWorldDetails, FeedbackSurvey, NewUnlock
 }
 
@@ -178,6 +178,12 @@ public sealed class ScreenRecognizer
         if (Has(@"^DEFEAT$") && Has(@"\b(TEAM SCORE|CONTINUE|MISSION STATS|REWARDS)\b"))
         {
             return Result(ScreenKind.Defeat, "Defeat heading corroborated by result controls", @"\bCONTINUE\b");
+        }
+
+        if (Has(@"\bRESTART MATCH\b") && Has(@"^ENDURANCE$")
+            && Has(@"^POWER LEVEL$") && Has(@"\bDROP YOUR STORM SHIELD AND SURVIVE\b"))
+        {
+            return Result(ScreenKind.EnduranceRestartRequired, "Endurance requires a fresh Homebase match");
         }
 
         if (Has(@"\bSTART ENDURANCE\b") && Has(@"\bSTORM SHIELD\b"))

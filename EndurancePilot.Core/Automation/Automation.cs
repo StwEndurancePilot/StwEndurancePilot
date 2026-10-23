@@ -156,7 +156,7 @@ public sealed class AutomationController
         }
     }
 
-    public void RequestTargetExit()
+    public void RequestTargetExit(string reason = "Target wave finished · preparing to leave Storm Shield")
     {
         if (TargetExitRequested || ErrorRecoveryOnly || Status is ControllerStatus.Stopped or ControllerStatus.PausedForAttention)
         {
@@ -172,7 +172,7 @@ public sealed class AutomationController
         transitionPlanFrames = 0;
         nextActionAt = default;
         Status = ControllerStatus.Observing;
-        Detail = "Target wave finished · preparing to leave Storm Shield";
+        Detail = reason;
     }
 
     private NavigationDecision DecideNavigation(Observation frame, ScreenEvidence evidence)
@@ -640,7 +640,7 @@ public sealed class AutomationController
             Detail = "Final attempt ended · waiting for reward cleanup and a stable menu";
             return null;
         }
-        if (RunInProgress && !TargetExitRequested && evidence.Kind is ScreenKind.Homebase or ScreenKind.Backpack or ScreenKind.StormShieldConsole or ScreenKind.EnduranceSetup or ScreenKind.EnduranceStatus)
+        if (RunInProgress && !TargetExitRequested && evidence.Kind is ScreenKind.Homebase or ScreenKind.Backpack or ScreenKind.StormShieldConsole or ScreenKind.EnduranceSetup or ScreenKind.EnduranceStatus or ScreenKind.EnduranceRestartRequired)
         {
             stableFrames = 0;
             Detail = "Run is active; leaving the console alone until the run ends";
