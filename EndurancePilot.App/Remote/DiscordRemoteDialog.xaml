@@ -14,12 +14,10 @@
  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
   <StackPanel Margin="28">
    <TextBlock x:Name="Heading" Text="Connect Discord" FontSize="24" FontWeight="SemiBold" />
-   <TextBlock x:Name="Intro" Text="Run /pair in Discord, then paste your details." Style="{StaticResource Caption}" Margin="0,6,0,24" />
+   <TextBlock x:Name="Intro" Text="Run /pair in Discord, then paste your pairing code." Style="{StaticResource Caption}" Margin="0,6,0,24" />
    <StackPanel x:Name="Setup">
-    <TextBlock Text="Discord ID" Margin="0,0,0,6" />
-    <TextBox x:Name="UserId" AutomationProperties.Name="Discord ID" MaxLength="20" Padding="11,9" Margin="0,0,0,18" Background="{DynamicResource PilotSurface}" Foreground="{DynamicResource PilotText}" BorderBrush="{DynamicResource PilotBorder}" />
     <TextBlock Text="Pairing code" Margin="0,0,0,6" />
-    <PasswordBox x:Name="PairingCode" AutomationProperties.Name="Pairing code" MaxLength="32" Padding="11,9" Margin="0,0,0,24" Background="{DynamicResource PilotSurface}" Foreground="{DynamicResource PilotText}" BorderBrush="{DynamicResource PilotBorder}" />
+    <PasswordBox x:Name="PairingCode" AutomationProperties.Name="Pairing code" MaxLength="128" Padding="11,9" Margin="0,0,0,24" Background="{DynamicResource PilotSurface}" Foreground="{DynamicResource PilotText}" BorderBrush="{DynamicResource PilotBorder}" />
    </StackPanel>
    <Border x:Name="ConnectionCard" Background="{DynamicResource PilotSurface}" CornerRadius="10" Padding="16" Margin="0,0,0,24" Visibility="Collapsed">
     <StackPanel><TextBlock x:Name="ConnectionTitle" Text="Connected" FontWeight="SemiBold" /><TextBlock x:Name="ConnectionDetail" Style="{StaticResource Caption}" Margin="0,5,0,0" /></StackPanel>

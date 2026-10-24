@@ -85,6 +85,9 @@ test('pairing rejects a wrong user and expires without letting bad guesses lock 
   assert.equal(message.data.flags, 64);
   assert.deepEqual(message.data.allowed_mentions, { parse: [] });
   assert.equal(message.data.embeds[0].title, 'Connect your PC');
+  assert.equal(message.data.embeds[0].fields.some(x => x.name === 'Discord user ID'), false);
+  const bundled = message.data.embeds[0].fields.find(x => x.name === 'One-time pairing code').value;
+  assert.match(bundled, new RegExp('^```\\nEP1\\.' + userA + '\\.[a-f0-9]{32}\\n```$'));
   assert.match(message.data.embeds[0].fields.find(x => x.name === 'Expires').value, /<t:\d+:R>/);
   const code = message.data.embeds[0].fields.find(x => x.name === 'One-time pairing code').value.match(/[a-f0-9]{32}/)[0];
   const key = await identity();

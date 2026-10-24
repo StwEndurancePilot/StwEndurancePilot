@@ -17,7 +17,6 @@ internal partial class DiscordRemoteDialog : Window
         MaxHeight = SystemParameters.WorkArea.Height;
         this.remote = remote;
         defaults = DiscordPublicSettings.Load();
-        UserId.Text = remote.Configuration?.UserId ?? "";
         timer.Tick += (_, _) => Refresh();
         Closed += (_, _) => { timer.Stop(); lifetime.Cancel(); PairingCode.Clear(); };
         Refresh();
@@ -31,10 +30,10 @@ internal partial class DiscordRemoteDialog : Window
         Setup.Visibility = PairButton.Visibility = PairingNote.Visibility = paired ? Visibility.Collapsed : Visibility.Visible;
         ConnectionCard.Visibility = DisconnectButton.Visibility = DoneButton.Visibility = paired ? Visibility.Visible : Visibility.Collapsed;
         Heading.Text = paired ? "Discord connected" : "Connect Discord";
-        Intro.Text = paired ? "Keep Pilot open to use your commands." : "Run /pair in Discord, then paste your details.";
+        Intro.Text = paired ? "Keep Pilot open to use your commands." : "Run /pair in Discord, then paste your pairing code.";
         ConnectionTitle.Text = remote.Status == "Connected" ? "Connected to Discord" : "Connection status";
         ConnectionDetail.Text = remote.Status == "Connected" ? "Ready for /pilot accounts, /pilot progress and more." : remote.Status;
-        UserId.IsEnabled = PairingCode.IsEnabled = !paired && !busy;
+        PairingCode.IsEnabled = !paired && !busy;
         PairButton.IsEnabled = !busy && defaults is not null;
         DisconnectButton.IsEnabled = !busy;
         PairButton.Content = busy ? "Connecting…" : "Pair this PC";
@@ -48,19 +47,17 @@ internal partial class DiscordRemoteDialog : Window
     {
         if (busy) return;
         if (defaults is null) { Message("This build is missing its Discord configuration. Install a configured build."); return; }
-        if (!System.Text.RegularExpressions.Regex.IsMatch(UserId.Text.Trim(), @"\A[0-9]{17,20}\z"))
-        { Message("Copy your Discord user ID from the /pair message."); UserId.Focus(); return; }
-        if (!System.Text.RegularExpressions.Regex.IsMatch(PairingCode.Password.Trim(), @"\A[a-fA-F0-9]{32}\z"))
-        { Message("Paste the complete pairing code from /pair."); PairingCode.Focus(); return; }
+        if (!RemotePairingCode.TryParse(PairingCode.Password, out var user, out var secret))
+        { Message("Paste the complete code starting with EP1. from a fresh /pair message."); PairingCode.Focus(); return; }
         busy = true; Message(""); Refresh();
         try
         {
-            await remote.PairAsync(defaults.WorkerOrigin, UserId.Text.Trim(), PairingCode.Password.Trim(), true,
+            await remote.PairAsync(defaults.WorkerOrigin, user, secret, true,
                 true, defaults.ApplicationId, defaults.PublicKey, lifetime.Token);
             PairingCode.Clear();
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
-        catch { Message("Couldn’t pair this PC. Check your user ID and use a fresh /pair code. If already paired, run /unpair first."); }
+        catch { Message("Couldn’t pair this PC. Use a fresh /pair code. If already paired, run /unpair first."); }
         finally { busy = false; Refresh(); }
     }
 

@@ -29,8 +29,8 @@ The workflow is separate from Windows releases. It pins GitHub actions to commit
 
 ## Pair and use
 
-1. Run `/pair`. Its private reply contains the Worker origin, your Discord user ID and a random code valid for five minutes.
-2. On your own PC, open Pilot's **Epic account menu → Discord remote control**. Enter your Discord user ID and the one-time pairing code. Official builds include the Worker origin, application ID and verification public key. Fork operators configure those three public settings in the embedded public configuration before building.
+1. Run `/pair`. Its private reply contains one code valid for five minutes. The code bundles your public Discord user ID with a 128-bit random secret; the ID alone cannot authorize pairing.
+2. On your own PC, open Pilot's **Epic account menu → Discord remote control**. Paste the one-time pairing code; no separate Discord ID is needed. Official builds include the Worker origin, application ID and verification public key. Fork operators configure those three public settings in the embedded public configuration before building.
 3. Pairing enables game/account actions and Fortnite screenshots, as stated beneath the Pair button. It also grants progress, statistics and account display-name access.
 4. Select **Pair this PC**. Pairing survives updates, app restarts and Windows reboots and remains valid until you disconnect locally or use /unpair. Pilot must be open to receive commands. Keep the PC clock synchronized; device requests allow 60 seconds of skew, and desktop commands have a stricter 90-second proof lifetime with at most five seconds of future skew.
 

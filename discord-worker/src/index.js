@@ -111,10 +111,9 @@ export class Device {
         const user = i.member?.user?.id ?? i.user.id;
         return json({ type: 4, data: { flags: 64, allowed_mentions: { parse: [] }, embeds: [{
           title: 'Connect your PC', color: 0xB52739,
-          description: 'Open **Pilot → account menu → Discord remote control**.\nPaste these two values and select **Pair this PC**.',
+          description: 'Open **Pilot → account menu → Discord remote control**.\nPaste this code and select **Pair this PC**.',
           fields: [
-            { name: 'Discord user ID', value: `\`\`\`\n${user}\n\`\`\`` },
-            { name: 'One-time pairing code', value: `\`\`\`\n${code}\n\`\`\`` },
+            { name: 'One-time pairing code', value: `\`\`\`\nEP1.${user}.${code}\n\`\`\`` },
             { name: 'Expires', value: `<t:${Math.floor(state.pairUntil / 1000)}:R>` }
           ]
         }] } });

@@ -6,6 +6,12 @@ internal static class RemoteChecks
     {
         var checks = new List<StartupCheck>();
         void Check(string name, bool passed) => checks.Add(new(name, passed, passed ? "Passed" : "Failed"));
+        string pairCode = "EP1.111111111111111111." + new string('a', 32);
+        Check("Pairing code carries the user and full random secret", RemotePairingCode.TryParse("  " + pairCode + "\r\n", out var pairUser, out var pairSecret)
+            && pairUser == "111111111111111111" && pairSecret == new string('a', 32));
+        foreach (var invalid in new[] { "", new string('a', 32), pairCode + ".extra", pairCode.Replace("EP1", "EP2"),
+            pairCode.Replace("111111111111111111", "../other"), pairCode[..^1], pairCode + "\nignored", new string('a', 129) })
+            Check("Malformed pairing code is rejected", !RemotePairingCode.TryParse(invalid, out _, out _));
         var configuration = new RemoteConfiguration("https://pilot.example", "111111111111111111", "", false, false,
             "333333333333333333", new string('0', 64), 0, long.MaxValue);
         foreach (var command in new[] { "progress", "statistics", "accounts" })
