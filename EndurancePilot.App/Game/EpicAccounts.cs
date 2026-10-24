@@ -59,6 +59,26 @@ internal sealed class EpicAccounts
         Save();
     }
 
+    internal (int Imported, int Skipped) Import(IEnumerable<EpicAccount> candidates)
+    {
+        var additions = new List<EpicAccount>();
+        var names = new HashSet<string>(accounts.Select(a => a.DisplayName.Trim()), StringComparer.OrdinalIgnoreCase);
+        var ids = new HashSet<string>(accounts.Select(a => a.AccountId), StringComparer.OrdinalIgnoreCase);
+        int skipped = 0;
+        foreach (var account in candidates)
+        {
+            if (names.Contains(account.DisplayName.Trim()) || ids.Contains(account.AccountId)) { skipped++; continue; }
+            names.Add(account.DisplayName.Trim()); ids.Add(account.AccountId); additions.Add(account);
+        }
+        if (additions.Count == 0) return (0, skipped);
+        string? previous = SelectedAccountId;
+        accounts.AddRange(additions);
+        SelectedAccountId ??= additions[0].AccountId;
+        try { Save(); }
+        catch { accounts.RemoveRange(accounts.Count - additions.Count, additions.Count); SelectedAccountId = previous; throw; }
+        return (additions.Count, skipped);
+    }
+
     public void Remove(string accountId)
     {
         accounts.RemoveAll(a => a.AccountId == accountId);

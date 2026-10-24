@@ -20,6 +20,17 @@ public partial class AccountsPane : System.Windows.Controls.UserControl
     }
 
     public void FocusBack() => BackButton.Focus();
+    private void ImportPennyClicked(object sender, RoutedEventArgs e)
+    {
+        if (working) return;
+        try
+        {
+            SetStatus(PennyAccountImport.Import(EpicLauncher.Accounts));
+            RefreshAccounts();
+            AccountSelectionChanged?.Invoke(this, EventArgs.Empty);
+        }
+        catch (InvalidOperationException error) { SetStatus(error.Message, true); }
+    }
     public void CancelPending() => closing.Cancel();
     private void BackClicked(object sender, RoutedEventArgs e)
     {

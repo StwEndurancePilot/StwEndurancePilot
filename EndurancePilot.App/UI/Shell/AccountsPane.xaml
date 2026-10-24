@@ -40,6 +40,7 @@
       <StackPanel Margin="28,20,28,24">
         <TextBlock Text="Choose who starts Fortnite with Endurance Pilot." FontSize="12"
                    Foreground="{DynamicResource PilotSecondary}" Margin="0,0,0,20" />
+        <ui:Button Content="Import from Penny Launcher" Click="ImportPennyClicked" HorizontalAlignment="Stretch" Margin="0,0,0,18" />
         <Grid Margin="0,0,0,9">
           <TextBlock Text="Your accounts" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
           <TextBlock x:Name="AccountCountText" HorizontalAlignment="Right" VerticalAlignment="Center"

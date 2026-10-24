@@ -40,6 +40,7 @@ public partial class PilotWindow : FluentWindow
             if (loaded) RefreshState();
         }));
         host.InitializeBridge();
+        PennyAccountImport.ImportOnce(EpicLauncher.Accounts);
         InitializeRemote();
         InitializeTray();
         ApplyThemePreference();
