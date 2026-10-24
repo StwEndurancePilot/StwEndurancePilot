@@ -8,6 +8,37 @@ internal sealed class TargetChangedException() : InvalidOperationException("Dete
 
 internal static class GameInput
 {
+    // Only called for an explicit remote Start, never by the background polling loop.
+    internal static async Task<bool> FocusForRemoteStartAsync(GameWindow game, CancellationToken cancellation)
+    {
+        cancellation.ThrowIfCancellationRequested();
+        if (GameWindow.Find() != game) return false;
+        if (game.IsForeground) return true;
+        game.Activate();
+        await Task.Delay(100, cancellation);
+        if (GameWindow.Find() != game) return false;
+        if (game.IsForeground) return true;
+
+        // A background request lacks the last-input permission that clicking Run gives
+        // Pilot. A balanced ALT tap lets Windows release its foreground lock. Do not
+        // combine it with a held key/button or attach input queues to another process.
+        for (int key = 1; key < 255; key++)
+            if ((GetAsyncKeyState(key) & 0x8000) != 0) return false;
+        var down = new NativeInput { Type = 1, Data = new() { Keyboard = new() { VirtualKey = 0x12 } } };
+        var up = new NativeInput { Type = 1, Data = new() { Keyboard = new() { VirtualKey = 0x12, Flags = 2 } } };
+        uint inserted = SendInput(2, [down, up], Marshal.SizeOf<NativeInput>());
+        if (inserted != 2)
+        {
+            if (inserted == 1) SendInput(1, [up], Marshal.SizeOf<NativeInput>());
+            return false;
+        }
+        await Task.Delay(100, cancellation);
+        if (GameWindow.Find() != game) return false;
+        game.Activate();
+        await Task.Delay(250, cancellation);
+        return GameWindow.Find() == game && game.IsForeground;
+    }
+
     public static async Task<bool> DispatchAsync(GameWindow game, Bitmap observedImage, ClickAction action,
         OcrService ocr, Func<bool> sessionIsCurrent, CancellationToken cancellation)
     {
