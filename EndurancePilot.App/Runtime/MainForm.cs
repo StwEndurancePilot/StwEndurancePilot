@@ -18,6 +18,8 @@ public sealed partial class MainForm : Form
     private readonly LaunchSupervisor launcher = new();
     private bool launchSelectedAccountOnStart;
     private readonly CrashRecovery crashRecovery = new();
+    private readonly StartupErrorRecovery startupErrorRecovery = new();
+    private CancellationTokenSource? startupErrorRestart;
     private readonly ProcessExitObserver processExits = new();
     private bool pausedByException;
     private readonly ComboBox zone = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 150 };
@@ -533,6 +535,7 @@ public sealed partial class MainForm : Form
 
     private void Stop(string reason)
     {
+        startupErrorRestart?.Cancel();
         interactionPause.Clear();
         Notify(WebhookEvent.RunnerStopped, "Runner stopped", reason + " Stopping the runner does not itself leave an active Fortnite mission.", tracker.Current?.HighestWave);
         notificationSession = false;
@@ -592,6 +595,47 @@ public sealed partial class MainForm : Form
                 return;
             }
 
+            if (runnerMode && game is not null && controller.Status != ControllerStatus.PausedForAttention)
+            {
+                bool restart = startupErrorRecovery.Observe(observation, game.ProcessId);
+                if (StartupErrorRecovery.Matches(observation))
+                {
+                    timer.Interval = 500;
+                    if (startupErrorRecovery.Exhausted)
+                    {
+                        controller.Pause("Fortnite repeatedly failed to start. Check Epic Games Launcher before resuming.");
+                        launcher.Pause(controller.Detail);
+                        status.Text = controller.Detail;
+                    }
+                    else if (restart && GameWindow.Find() is { } currentGame && currentGame.ProcessId == game.ProcessId)
+                    {
+                        controller.InvalidateObservation();
+                        status.Text = "Fortnite startup error confirmed · restarting Fortnite";
+                        AddActivity(status.Text);
+                        using var recovery = CancellationTokenSource.CreateLinkedTokenSource(closing.Token);
+                        startupErrorRestart = recovery;
+                        try
+                        {
+                            await EpicLauncher.StopGameAsync(recovery.Token);
+                            if (closed || capturedSession != session || !runnerMode) return;
+                            var outcome = runner.RecoverAfterProcessExit(DateTimeOffset.UtcNow, "Fortnite startup error");
+                            if (outcome is not null) RecordOutcome(outcome);
+                            if (runSession.Phase == SessionPhase.Complete) { StopAfterSession(); return; }
+                            processExits.Reset();
+                            interactionPause.Clear();
+                            backgroundCapture?.Dispose(); backgroundCapture = null;
+                            if (launcher.Status == LaunchStatus.Stopped) launcher.Start();
+                            else launcher.RecoverAfterCrash();
+                            launchSelectedAccountOnStart = true;
+                            log.Write("startup-error-recovery", new { RestartRequested = true });
+                        }
+                        catch (OperationCanceledException) when (recovery.IsCancellationRequested) { }
+                        finally { startupErrorRestart = null; }
+                    }
+                    else status.Text = "Confirming Fortnite startup error before restarting";
+                    return;
+                }
+            }
             var evidence = recognizer.Recognize(observation);
             bool requireHomebaseIcon = !controller.HomebaseClickConfirmed && controller.Pending?.Step != NavigationStep.SelectHomebase;
             observation = await Task.Run(() => visualRecognizer.Enrich(image, observation, evidence.Kind, requireHomebaseIcon), closing.Token);

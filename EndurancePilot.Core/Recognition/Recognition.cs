@@ -94,6 +94,9 @@ public sealed class ScreenRecognizer
             return Result(ScreenKind.NeedsAttention, "Fortnite requires installation verification; dismiss once and pause", @"^CONTINUE$");
         }
 
+        if (StartupErrorRecovery.Matches(frame))
+            return Result(ScreenKind.NeedsAttention, "Fortnite startup failed; restart required");
+
         if (ErrorDialogs.Recognize(frame) is { } error)
         {
             return error;

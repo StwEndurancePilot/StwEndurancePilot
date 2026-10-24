@@ -188,6 +188,7 @@ RunnerSessionScenarios.Run(Check, epoch);
 TargetWaveScenarios.Run(Check, epoch);
 LaunchScenarios.Run(Check, epoch);
 CrashRecoveryScenarios.Run(Check, epoch);
+StartupErrorScenarios.Run(Check, epoch);
 ProcessExitScenarios.Run(Check, epoch);
 RewardScenarios.Run(Check, epoch);
 MissionRewardScenarios.Run(Check, epoch);
