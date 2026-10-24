@@ -269,12 +269,12 @@ public static class NavigationPlanner
                 if (assistanceOn is not null && assistanceOff is null && !profile.WaitForAssistance)
                 {
                     return new(new(NavigationStep.DisableAssistance, "Turn off Wait for Assistance",
-                        MenuGeometry.Target(NavigationStep.DisableAssistance, frame)), "Disable assistance");
+                        assistanceOn.Value), "Disable assistance");
                 }
                 if (assistanceOff is not null && assistanceOn is null && profile.WaitForAssistance)
                 {
                     return new(new(NavigationStep.EnableAssistance, "Turn on Wait for Assistance",
-                        MenuGeometry.Target(NavigationStep.EnableAssistance, frame)), "Enable assistance");
+                        assistanceOff.Value), "Enable assistance");
                 }
 
                 if (profile.WaitForAssistance ? assistanceOn is null || assistanceOff is not null
@@ -283,8 +283,7 @@ public static class NavigationPlanner
                     return new(null, "Waiting to verify Wait for Assistance is " + (profile.WaitForAssistance ? "checked" : "unchecked"));
                 }
 
-                return new(new(NavigationStep.StartEndurance, "Start endurance",
-                    MenuGeometry.Target(NavigationStep.StartEndurance, frame)), "Start endurance");
+                return Text(NavigationStep.StartEndurance, "Start endurance", screen.Targets);
             default:
                 return new(null, "Observing " + screen.Kind);
         }

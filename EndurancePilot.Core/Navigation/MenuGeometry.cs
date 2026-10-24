@@ -11,8 +11,7 @@ public static class MenuGeometry
         NavigationStep.OpenMap or NavigationStep.ChangeZone or NavigationStep.EnterZone
         or NavigationStep.SelectHomebase or NavigationStep.OpenHomebase or NavigationStep.SelectOwnHomebase
         or NavigationStep.LaunchHomebase or NavigationStep.LaunchLoadedHomebase
-        or NavigationStep.SelectStormShieldTab or NavigationStep.SelectEndurance or NavigationStep.SelectStormShieldExpansion
-        or NavigationStep.DisableAssistance or NavigationStep.EnableAssistance or NavigationStep.StartEndurance;
+        or NavigationStep.SelectStormShieldTab or NavigationStep.SelectEndurance or NavigationStep.SelectStormShieldExpansion;
 
     public static Box Target(NavigationStep step, Observation frame, bool forward = true)
     {

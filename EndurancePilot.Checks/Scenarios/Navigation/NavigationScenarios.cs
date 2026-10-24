@@ -82,6 +82,10 @@ internal static class NavigationScenarios
         var setupEvidence = recognizer.Recognize(assistanceSetup);
         check("Wait for assistance off starts when unchecked", NavigationPlanner.Decide(uncheckedSetup, setupEvidence, profile).Plan?.Step == NavigationStep.StartEndurance);
         check("Wait for assistance off clears a checked box", NavigationPlanner.Decide(checkedSetup, setupEvidence, profile).Plan?.Step == NavigationStep.DisableAssistance);
+        check("Assistance click follows the detected checkbox", NavigationPlanner.Decide(checkedSetup, setupEvidence, profile).Plan?.Target == checkedSetup.Visuals![0].Bounds);
+        var movedSetup = checkedSetup with { Visuals = [new("assistance-checked", new(565, 432, 25, 25), .95, .2)] };
+        check("Shifted setup layout moves the assistance click", NavigationPlanner.Decide(movedSetup, setupEvidence, profile).Plan?.Target == movedSetup.Visuals![0].Bounds);
+        check("Start Endurance follows its detected label", NavigationPlanner.Decide(uncheckedSetup, setupEvidence, profile).Plan?.Target == AutomationController.UniqueTarget(setupEvidence.Targets));
         var assistedProfile = profile with { WaitForAssistance = true };
         check("Wait for assistance on checks an unchecked box", NavigationPlanner.Decide(uncheckedSetup, setupEvidence, assistedProfile).Plan?.Step == NavigationStep.EnableAssistance);
         check("Wait for assistance on starts when checked", NavigationPlanner.Decide(checkedSetup, setupEvidence, assistedProfile).Plan?.Step == NavigationStep.StartEndurance);
