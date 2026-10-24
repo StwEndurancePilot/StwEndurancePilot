@@ -59,12 +59,20 @@ public partial class PilotWindow
                 if (command.Account is null) return AccountMenu(true);
                 if (command.AccountSet is not null && command.AccountSet != accountSet)
                     return new("Your saved accounts have changed. Run /pilot accounts again for a fresh list.");
-                if (host.Snapshot().Running || remoteLogin is not null || EpicLauncher.Inspect() is { GamePresent: true } or { BootstrapperPresent: true })
-                    return new("Stop the runner, close Fortnite and finish sign-in before switching accounts.");
+                if (host.Snapshot().Running)
+                    return new("Stop the runner with /pilot stop before changing the account for the next launch.");
                 if (command.Account is not { } number || number < 1 || number > EpicLauncher.Accounts.All.Count) return new("Account number is unavailable. Run /pilot accounts again.");
+                // Selecting a saved account supersedes an unfinished remote sign-in.
+                // Its completion must not later overwrite this explicit selection.
+                if (remoteLogin is { } pendingLogin)
+                {
+                    remoteLogin = null;
+                    pendingLogin.Cancel();
+                    remoteLoginStatus = "";
+                }
                 EpicLauncher.Accounts.Select(EpicLauncher.Accounts.All[number - 1].AccountId);
                 RefreshAccountPicker();
-                return new("Selected account changed. Use /pilot launch when ready.");
+                return new("Selected account changed for your next Fortnite launch. Any game already open keeps its current account.");
             case "launch":
                 if (host.Snapshot().Running || remoteLogin is not null) return new("Stop the runner and finish sign-in before launching.");
                 await EpicLauncher.LaunchAsync(token);
@@ -106,14 +114,14 @@ public partial class PilotWindow
             using var auth = new EpicAuthentication();
             var account = await auth.FinishSignInAsync(signIn, source.Token);
             source.Token.ThrowIfCancellationRequested();
-            if (remote?.Configuration != config || remote.Status != "Connected") throw new OperationCanceledException();
+            if (remoteLogin != source || remote?.Configuration != config || remote.Status != "Connected") throw new OperationCanceledException();
             if (host.Snapshot().Running) throw new InvalidOperationException();
             EpicLauncher.Accounts.Add(account);
             RefreshAccountPicker();
             remoteLoginStatus = "Epic account connected.";
         }
-        catch { remoteLoginStatus = "Epic sign-in ended without adding an account. Start again if needed."; }
-        finally { remoteLogin = null; source.Dispose(); }
+        catch { if (remoteLogin == source) remoteLoginStatus = "Epic sign-in ended without adding an account. Start again if needed."; }
+        finally { if (remoteLogin == source) remoteLogin = null; source.Dispose(); }
     }
 
     private static string SafeAccountName(string name) => new(name.Where(c => char.IsLetterOrDigit(c) || c is ' ' or '-' or '_').Take(80).ToArray());
