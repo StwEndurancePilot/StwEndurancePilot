@@ -7,6 +7,26 @@ internal static class EpicLauncher
 {
     public const string LaunchUri = "com.epicgames.launcher://apps/Fortnite?action=launch&silent=true";
     public static EpicAccounts Accounts { get; } = new();
+    private static string? launchedAccount;
+    private static DateTimeOffset launchedAt;
+    internal static string ProgressAccount
+    {
+        get
+        {
+            // A selected account may differ from the game that is already open.
+            bool known = false;
+            foreach (var process in Process.GetProcessesByName("FortniteClient-Win64-Shipping"))
+            using (process)
+            {
+                try { known |= launchedAccount is not null && process.StartTime.ToUniversalTime() >= launchedAt.UtcDateTime
+                    && process.StartTime.ToUniversalTime() <= launchedAt.UtcDateTime.AddMinutes(2); }
+                catch { }
+            }
+            string name = known ? launchedAccount! : Accounts.Selected?.DisplayName ?? "No account selected";
+            name = new string(name.Where(c => !char.IsControl(c) && c != '`').Take(80).ToArray());
+            return known ? name + " (launched by Pilot)" : name + " (selected · game login unverified)";
+        }
+    }
     private static readonly SemaphoreSlim LaunchGate = new(1, 1);
     private static readonly string PathFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EndurancePilot", "fortnite-path.txt");
 
@@ -49,6 +69,8 @@ internal static class EpicLauncher
         var start = new ProcessStartInfo(executable) { WorkingDirectory = Path.GetDirectoryName(executable)!, UseShellExecute = false };
         foreach (string arg in args) start.ArgumentList.Add(arg);
         using var process = Process.Start(start) ?? throw new InvalidOperationException("Windows did not start FortniteLauncher.exe.");
+        launchedAccount = account.DisplayName;
+        launchedAt = DateTimeOffset.UtcNow;
         }
         finally { LaunchGate.Release(); }
     }

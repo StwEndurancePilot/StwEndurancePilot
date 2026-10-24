@@ -2,6 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { message, accountMenus, selection } from '../src/messages.js';
 const hash = 'a'.repeat(64);
+test('progress shows account, wave and time, with explicit errors only', () => {
+  const content = 'Account: offline-player\nStatus: Running\nWave: 12 / 30\nSession time: 2h 15m 00s\nCompleted runs: 1';
+  const normal = message('progress', content).embeds[0];
+  assert.equal(normal.title, 'Run progress');
+  assert.equal(normal.fields.find(f => f.name === 'Wave').value, '12 / 30');
+  assert.equal(normal.fields.some(f => f.name === 'Needs attention'), false);
+  const failed = message('progress', content + '\nError: Open Pilot to check the paused runner.').embeds[0];
+  assert.equal(failed.title, 'Run progress · Error');
+  assert.equal(failed.color, 0xDE777B);
+  assert.equal(failed.fields.find(f => f.name === 'Account').value, 'offline-player');
+});
 test('account menus cover 100 accounts with bounded signed selections', () => {
   const accounts = Array.from({ length: 100 }, (_, i) => ({ number: i + 1, name: `Account ${i + 1}`, selected: i === 0 }));
   const menus = accountMenus(accounts, hash);

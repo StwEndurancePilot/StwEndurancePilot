@@ -15,6 +15,13 @@ export function message(command, content, image = false, accounts = null) {
     embed.fields = content.split('\n').slice(0, 25).map(line => { const at = line.indexOf(': '); return { name: line.slice(0, at).slice(0, 256), value: line.slice(at + 2).slice(0, 1024) || '—', inline: true }; });
     delete embed.description;
   }
+  if (command === 'progress' && content.startsWith('Account: ') && embed.fields) {
+    const error = embed.fields.find(field => field.name === 'Error');
+    embed.title = error ? 'Run progress · Error' : 'Run progress';
+    embed.color = error ? 0xDE777B : 0x88B79D;
+    embed.fields = embed.fields.filter(field => field.name !== 'Needs attention');
+    embed.footer = { text: 'Live game reading · Session time includes pauses' };
+  }
   if (accounts?.length) {
     embed.title = 'Your accounts'; embed.color = 0xB8C8BE;
     const selected = accounts.find(a => a.selected);
@@ -28,6 +35,9 @@ export function message(command, content, image = false, accounts = null) {
   return { content: '', embeds: [embed], allowed_mentions: { parse: [] }, attachments: [], components: [] };
 }
 function failureDetails(command, content, image) {
+  // Progress has its own explicit Error field. Account names and wave notes
+  // must not accidentally trigger the generic prose error classifier.
+  if (command === 'progress' && content.startsWith('Account: ')) return null;
   if (command === 'screenshot' && !image) {
     if (/No visible Fortnite window/i.test(content)) return { title: 'Screenshot unavailable · Fortnite not found', next: 'Open Fortnite on your paired PC, then run `/screenshot` again.' };
     if (/disabled|not permitted/i.test(content)) return { title: 'Screenshot blocked · Permission required', next: 'Enable screenshot access by pairing again in Pilot, then retry.' };
