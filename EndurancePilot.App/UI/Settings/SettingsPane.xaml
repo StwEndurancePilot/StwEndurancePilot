@@ -22,6 +22,14 @@
             <ui:Button x:Name="DownloadUpdateButton" Content="Download update" HorizontalAlignment="Stretch" Margin="0,8,0,0" Visibility="Collapsed" Click="DownloadUpdateClicked" />
           </StackPanel>
         </Border>
+        <TextBlock Text="DISCORD" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PilotSecondary}" Margin="0,0,0,12" />
+        <Border CornerRadius="12" Background="{DynamicResource PilotSurface}" BorderBrush="{DynamicResource PilotBorder}" BorderThickness="1" Margin="0,0,0,24">
+          <StackPanel Margin="18">
+            <TextBlock Text="Discord connection" FontSize="14" FontWeight="SemiBold" />
+            <TextBlock Text="Pair this PC, check your connection or unlink Discord." FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource PilotSecondary}" Margin="0,6,0,14" />
+            <ui:Button Content="Manage Discord pairing" HorizontalAlignment="Stretch" Click="DiscordClicked" />
+          </StackPanel>
+        </Border>
         <TextBlock Text="BACKGROUND" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PilotSecondary}" Margin="0,0,0,12" />
         <Border CornerRadius="12" Background="{DynamicResource PilotSurface}" BorderBrush="{DynamicResource PilotBorder}" BorderThickness="1" Margin="0,0,0,24">
           <StackPanel Margin="18">

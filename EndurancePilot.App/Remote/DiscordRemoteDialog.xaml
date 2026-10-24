@@ -19,6 +19,9 @@
    <TextBlock x:Name="Heading" Text="Connect Discord" FontSize="24" FontWeight="SemiBold" />
    <TextBlock x:Name="Intro" Text="Run /pair in Discord, then paste your pairing code." Style="{StaticResource Caption}" Margin="0,6,0,24" />
    <StackPanel x:Name="Setup">
+    <TextBlock Margin="0,0,0,18" FontSize="12">
+     <Hyperlink x:Name="InstallLink" Click="AddToDiscordClicked" Foreground="{DynamicResource PilotAccent}">Add Pilot to Discord ↗</Hyperlink>
+    </TextBlock>
     <TextBlock Text="Pairing code" Margin="0,0,0,6" />
     <PasswordBox x:Name="PairingCode" AutomationProperties.Name="Pairing code" MaxLength="128" Padding="11,9" Margin="0,0,0,24" Background="{DynamicResource PilotSurface}" Foreground="{DynamicResource PilotText}" BorderBrush="{DynamicResource PilotBorder}" />
    </StackPanel>

@@ -390,12 +390,6 @@ public partial class PilotWindow : FluentWindow
         if (EpicLauncher.Accounts.All.Count > 0)
         {
             AccountMenuItems.Children.Add(new Border { Height = 1, Margin = new Thickness(7, 6, 7, 6), Background = (Brush)FindResource("PilotBorder") });
-            AddAccountMenuAction(SymbolRegular.Play24, "Launch Fortnite", async () =>
-            {
-                AccountPopup.IsOpen = false;
-                try { await EpicLauncher.LaunchAsync(); }
-                catch (Exception error) { System.Windows.MessageBox.Show(this, error.Message, "Fortnite launch"); }
-            });
             AddAccountMenuAction(SymbolRegular.Settings24, "Manage accounts", () => OpenAccounts(false));
         }
         AccountMenuItems.Children.Add(new Border { Height = 1, Margin = new Thickness(7, 6, 7, 6), Background = (Brush)FindResource("PilotBorder") });
@@ -563,6 +557,7 @@ public partial class PilotWindow : FluentWindow
         RefreshUpdates();
         settingsPane.SetRunning(host.Snapshot().Running);
         settingsPane.BackRequested += (_, _) => ShowMainView();
+        settingsPane.DiscordRequested += (_, _) => OpenRemote();
         SettingsHost.Content = settingsPane;
         SettingsHost.Visibility = Visibility.Visible;
         MainView.IsEnabled = false;

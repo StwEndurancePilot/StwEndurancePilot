@@ -17,6 +17,7 @@ internal partial class DiscordRemoteDialog : Wpf.Ui.Controls.FluentWindow
         MaxHeight = SystemParameters.WorkArea.Height;
         this.remote = remote;
         defaults = DiscordPublicSettings.Load();
+        InstallLink.IsEnabled = defaults is not null;
         timer.Tick += (_, _) => Refresh();
         Closed += (_, _) => { timer.Stop(); lifetime.Cancel(); PairingCode.Clear(); };
         Refresh();
@@ -68,6 +69,14 @@ internal partial class DiscordRemoteDialog : Wpf.Ui.Controls.FluentWindow
         try { await remote.DisconnectAsync(); Message(remote.Status == "Disabled" ? "Disconnected. You can pair again whenever you’re ready." : remote.Status); }
         catch { Message("Could not remove saved settings. Run /unpair in Discord and close Pilot to revoke access."); }
         finally { busy = false; Refresh(); }
+    }
+
+    private void AddToDiscordClicked(object sender, RoutedEventArgs e)
+    {
+        if (defaults is null) return;
+        string url = "https://discord.com/oauth2/authorize?client_id=" + defaults.ApplicationId;
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true }); }
+        catch { Message("Could not open your browser. Add Pilot at " + url); }
     }
 
     private void DoneClicked(object sender, RoutedEventArgs e) => Close();

@@ -13,6 +13,8 @@ public partial class PilotWindow
         remote.Start();
     }
 
+    private void DiscordClicked(object sender, System.Windows.RoutedEventArgs e) => OpenRemote();
+
     private void OpenRemote()
     {
         AccountPopup.IsOpen = false;

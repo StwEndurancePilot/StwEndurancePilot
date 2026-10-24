@@ -21,6 +21,8 @@ public partial class SettingsPane : System.Windows.Controls.UserControl
         StartupToggle.Checked += Changed; StartupToggle.Unchecked += Changed;
     }
     public event EventHandler? BackRequested;
+    public event EventHandler? DiscordRequested;
+    private void DiscordClicked(object sender, RoutedEventArgs e) => DiscordRequested?.Invoke(this, EventArgs.Empty);
     private readonly Func<bool, string?> saveLaunch;
     private readonly Func<bool, string?> saveManualTheme;
     private readonly Func<bool, string?> saveIndefinite;
