@@ -9,7 +9,7 @@ internal sealed record RunnerSettings(HomebaseZone Zone = HomebaseZone.TwinePeak
     bool ManualThemeEnabled = false, bool ManualDarkTheme = true, int TargetWave = 30,
     WebhookSettings? Webhook = null, bool EndRunWhenTargetReached = true, bool WaitForAssistance = false,
     bool AutoResumeFortnite = true, int AutoResumeIdleSeconds = 10,
-    string StartStopHotkey = RunnerHotkey.Default)
+    string StartStopHotkey = RunnerHotkey.Default, bool CloseToTray = true, bool StartWithWindows = false)
 {
     public void Validate()
     {

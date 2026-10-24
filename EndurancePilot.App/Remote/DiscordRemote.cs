@@ -8,8 +8,9 @@ namespace EndurancePilot.App;
 
 internal sealed record RemoteConfiguration(string Origin, string UserId, string KeyName, bool AllowControl, bool AllowScreenshots,
     string ApplicationId, string DiscordPublicKey, long PairedAt, long KeyExpires);
-internal sealed record RemoteCommand(string Id, string Command, int? Account, long Expires, DiscordProof? Proof = null);
-internal sealed record RemoteResult(string Content, string? Image = null)
+internal sealed record RemoteCommand(string Id, string Command, int? Account, long Expires, DiscordProof? Proof = null, string? AccountSet = null);
+internal sealed record RemoteAccountChoice(int Number, string Name, bool Selected);
+internal sealed record RemoteResult(string Content, string? Image = null, RemoteAccountChoice[]? Accounts = null, string? AccountSet = null)
 {
     public override string ToString() => "Remote result (content redacted)";
 }
@@ -48,7 +49,8 @@ internal sealed class DiscordRemote : IDisposable
             ownsInstance = true;
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { ownsInstance = false; }
-        if (!ownsInstance) { Status = "Remote storage is unavailable or open in another Pilot instance."; return; }
+        // Read the saved identity even if another process briefly owns the connection
+        // during an update. It must not look like the user has never paired this PC.
         try
         {
             if (File.Exists(path))
@@ -60,17 +62,13 @@ internal sealed class DiscordRemote : IDisposable
                     Validate(configuration.Origin, configuration.UserId);
                     RemoteCommandProof.ValidateIdentity(configuration.ApplicationId, configuration.DiscordPublicKey);
                     using var key = RemoteDeviceKey.Open(configuration.KeyName);
-                    if (configuration.KeyExpires <= DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
-                    {
-                        key.Delete();
-                        File.Delete(path);
-                        Configuration = null;
-                        Status = "Pairing expired. Unlink in Discord and pair again.";
-                    }
+                    // Legacy KeyExpires is retained for file compatibility only.
+                    // A saved pairing lasts until explicit revocation, including across upgrades.
                 }
             }
         }
         catch { Configuration = null; Status = "Saved connection could not be read. Pair again."; }
+        if (!ownsInstance) Status = "Remote storage is unavailable or open in another Pilot instance. Close the other instance and reopen Pilot.";
     }
 
     internal static Uri Validate(string origin, string user)
@@ -84,6 +82,7 @@ internal sealed class DiscordRemote : IDisposable
     internal void Start()
     {
         if (!ownsInstance || shutdown.IsCancellationRequested || Configuration is null || lifetime is not null) return;
+        Status = "Reconnecting to Discord…";
         lifetime = CancellationTokenSource.CreateLinkedTokenSource(shutdown.Token);
         loop = RunAsync(Configuration, lifetime.Token);
     }
@@ -101,13 +100,13 @@ internal sealed class DiscordRemote : IDisposable
             if (Configuration is not null) throw new InvalidOperationException("Disconnect the current PC pairing first.");
             var uri = Validate(origin.Trim(), user.Trim());
             RemoteCommandProof.ValidateIdentity(application.Trim(), publicKey.Trim());
-            if (!Regex.IsMatch(code.Trim(), "\\A[a-f0-9]{32}\\z")) throw new InvalidDataException("Enter the pairing code from /pilot pair.");
+            if (!Regex.IsMatch(code.Trim(), "\\A[a-f0-9]{32}\\z")) throw new InvalidDataException("Enter the pairing code from /pair.");
             keyName = RemoteDeviceKey.Create();
             long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             var config = new RemoteConfiguration(uri.GetLeftPart(UriPartial.Authority), user.Trim(), keyName, control, screenshots,
-                application.Trim(), publicKey.Trim().ToLowerInvariant(), now, now + (long)TimeSpan.FromDays(90).TotalMilliseconds);
+                application.Trim(), publicKey.Trim().ToLowerInvariant(), now, long.MaxValue);
             using var response = await SendAsync(config, "pair", new { code = code.Trim(), publicKey = RemoteDeviceKey.PublicKey(keyName) }, token);
-            if (!response.IsSuccessStatusCode) throw new InvalidOperationException("Pairing failed. Request a fresh code using /pilot unlink, then /pilot pair.");
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException("Pairing failed. Request a fresh code using /unpair, then /pair.");
             using var result = JsonDocument.Parse(await response.Content.ReadAsByteArrayAsync(token));
             if (!result.RootElement.GetProperty("paired").GetBoolean()) throw new InvalidDataException();
             token.ThrowIfCancellationRequested();
@@ -142,10 +141,10 @@ internal sealed class DiscordRemote : IDisposable
             {
                 using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(8));
                 using var response = await SendAsync(config, "revoke", new { }, timeout.Token);
-                if (!response.IsSuccessStatusCode) Status = "Disabled locally. Use /pilot unlink to clear the cloud pairing.";
+                if (!response.IsSuccessStatusCode) Status = "Disabled locally. Use /unpair to clear the cloud pairing.";
             }
         }
-        catch { Status = "Disabled locally. Use /pilot unlink to clear the cloud pairing."; }
+        catch { Status = "Disabled locally. Use /unpair to clear the cloud pairing."; }
         finally
         {
             // Deleting the key makes a leftover configuration unusable, even if file deletion fails.
@@ -183,18 +182,15 @@ internal sealed class DiscordRemote : IDisposable
         {
             try
             {
-                if (config.KeyExpires <= DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
-                {
-                    Status = "Pairing expired. Disconnect and pair again.";
-                    ConnectionStopped?.Invoke();
-                    return;
-                }
                 using var response = await SendAsync(config, "poll", new { }, token);
                 if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                 {
-                    Status = "Pairing revoked. Disconnect locally before pairing again.";
+                    // A 401 can also mean clock skew after sleep or a transient authentication
+                    // failure. Keep the saved key and retry; never execute an untrusted command.
+                    Status = "Connection not authorized; retrying. If you used /unpair, disconnect here and pair again.";
                     ConnectionStopped?.Invoke();
-                    return;
+                    await Task.Delay(TimeSpan.FromSeconds(10), token);
+                    continue;
                 }
                 response.EnsureSuccessStatusCode();
                 // A Worker response should be tiny; do not deserialize unbounded remote data.
@@ -229,7 +225,7 @@ internal sealed class DiscordRemote : IDisposable
                         LastCommandStatus = "Desktop action finished; sending reply.";
                         try
                         {
-                            using var sent = await SendAsync(config, "result", new { id = command.Id, content = result.Content, image = result.Image }, token);
+                            using var sent = await SendAsync(config, "result", new { id = command.Id, content = result.Content, image = result.Image, accounts = result.Accounts, accountSet = result.AccountSet }, token);
                             LastCommandStatus = await DescribeReplyAsync(sent, token);
                             if (!sent.IsSuccessStatusCode) Status = "Reply was not delivered. Check Discord before repeating an action.";
                         }

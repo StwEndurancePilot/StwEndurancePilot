@@ -36,15 +36,26 @@ internal static class RemoteCommandProof
             var i = document.RootElement;
             string? user = i.TryGetProperty("member", out var member) ? member.GetProperty("user").GetProperty("id").GetString() : i.GetProperty("user").GetProperty("id").GetString();
             if (i.GetProperty("application_id").GetString() != configuration.ApplicationId || user != configuration.UserId ||
-                i.GetProperty("id").GetString() != command.Id || i.GetProperty("type").GetInt32() != 2) return false;
+                i.GetProperty("id").GetString() != command.Id) return false;
             var data = i.GetProperty("data");
+            if (i.GetProperty("type").GetInt32() == 3)
+            {
+                if (command.Command != "switch" || data.GetProperty("component_type").GetInt32() != 3) return false;
+                var match = Regex.Match(data.GetProperty("custom_id").GetString() ?? "", @"\Apilot:switch:([a-f0-9]{64}):([0-3])\z");
+                var values = data.GetProperty("values");
+                if (!match.Success || values.GetArrayLength() != 1 || !Regex.IsMatch(values[0].GetString() ?? "", @"\A(?:[1-9][0-9]?|100)\z")) return false;
+                int number = int.Parse(values[0].GetString()!);
+                int page = int.Parse(match.Groups[2].Value);
+                return number > page * 25 && number <= (page + 1) * 25 && command.Account == number && command.AccountSet == match.Groups[1].Value;
+            }
+            if (i.GetProperty("type").GetInt32() != 2 || command.AccountSet is not null) return false;
             if (data.GetProperty("name").GetString() != "pilot") return false;
             var options = data.GetProperty("options");
             if (options.GetArrayLength() != 1) return false;
             var option = options[0];
             if (option.GetProperty("name").GetString() != command.Command || option.GetProperty("type").GetInt32() != 1) return false;
             int? account = null;
-            if (command.Command == "switch")
+            if (command.Command == "switch" && option.TryGetProperty("options", out var switchArguments) && switchArguments.GetArrayLength() > 0)
             {
                 var arguments = option.GetProperty("options");
                 if (arguments.GetArrayLength() != 1 || arguments[0].GetProperty("name").GetString() != "account" || arguments[0].GetProperty("type").GetInt32() != 4) return false;

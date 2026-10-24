@@ -41,6 +41,7 @@ public partial class PilotWindow : FluentWindow
         }));
         host.InitializeBridge();
         InitializeRemote();
+        InitializeTray();
         ApplyThemePreference();
         var settings = host.ReadSettings();
         ZoneChoice.ItemsSource = Enum.GetValues<HomebaseZone>().Where(z => z != HomebaseZone.Unspecified)
@@ -55,6 +56,7 @@ public partial class PilotWindow : FluentWindow
 
         Loaded += (_, _) =>
         {
+            if (Environment.GetCommandLineArgs().Contains("--tray")) Hide();
             loaded = true;
             ApplicationThemeManager.Changed += WindowsThemeChanged;
             windowsColours.ColorValuesChanged += WindowsColoursChanged;
@@ -64,8 +66,9 @@ public partial class PilotWindow : FluentWindow
             _ = PollUpdatesAsync();
         };
         refresh.Tick += (_, _) => RefreshState();
-        Closing += (_, _) =>
+        Closing += (_, e) =>
         {
+            if (KeepInTray(e)) return;
             loaded = false;
             accountsPane?.CancelPending();
             updateLifetime.Cancel();
@@ -549,6 +552,11 @@ public partial class PilotWindow : FluentWindow
                 return null;
             }
             catch (Exception error) { return error.Message; }
+        });
+        settingsPane.ConfigureLifecycle(host.ReadSettings(), (closeToTray, startup) =>
+        {
+            try { host.SetLifecycle(closeToTray, startup); return null; }
+            catch { return "Could not save background settings. No changes were applied."; }
         });
         settingsPane.CheckUpdatesRequested += async (_, _) => await CheckUpdatesAsync();
         settingsPane.OpenUpdateRequested += (_, _) => OpenUpdate();

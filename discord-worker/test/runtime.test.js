@@ -10,7 +10,7 @@ for (const discordStatus of [200, 302]) test(`Cloudflare runtime: pairing, isola
   const user = '111111111111111111';
   let outboundCalls = 0;
   const mf = new Miniflare(convertV4MiniflareOptions({
-    modules: [{ type: 'ESModule', path: 'src/index.js' }, { type: 'ESModule', path: 'src/device-auth.js' }], compatibilityDate: '2026-10-23',
+    modules: [{ type: 'ESModule', path: 'src/index.js' }, { type: 'ESModule', path: 'src/device-auth.js' }, { type: 'ESModule', path: 'src/messages.js' }], compatibilityDate: '2026-10-23',
     durableObjects: { DEVICES: { className: 'Device', useSQLite: true } },
     ratelimits: { DEVICE_RATE_LIMIT: { namespace_id: '817294', simple: { limit: 120, period: 60 } } },
     bindings: { DISCORD_PUBLIC_KEY: publicKey, DISCORD_APPLICATION_ID: app, PUBLIC_ORIGIN: 'https://pilot.example' },
@@ -18,7 +18,7 @@ for (const discordStatus of [200, 302]) test(`Cloudflare runtime: pairing, isola
       outboundCalls++;
       assert.equal(new URL(request.url).origin, 'https://discord.com');
       assert.equal(request.method, 'PATCH');
-      assert.equal((await request.json()).content, 'Runtime reply');
+      assert.equal((await request.json()).embeds[0].description, 'Runtime reply');
       return Response.json({ id: 'reply' }, { status: discordStatus,
         headers: discordStatus === 302 ? { Location: 'https://untrusted.example/' } : {} });
     }
@@ -26,7 +26,7 @@ for (const discordStatus of [200, 302]) test(`Cloudflare runtime: pairing, isola
   let sequence = 0;
   async function interaction(command, application = app) {
     const timestamp = String(Math.floor(Date.now() / 1000));
-    const body = JSON.stringify({ id: String(100000000000000000n + BigInt(++sequence)), type: 2, application_id: application, token: 'secret', user: { id: user }, data: { name: 'pilot', options: [{ name: command, type: 1 }] } });
+    const body = JSON.stringify({ id: String(100000000000000000n + BigInt(++sequence)), type: 2, application_id: application, token: 'secret', user: { id: user }, data: command === 'pair' ? { name: 'pair' } : command === 'unlink' ? { name: 'unpair' } : { name: 'pilot', options: [{ name: command, type: 1 }] } });
     const signature = Buffer.from(await crypto.subtle.sign('Ed25519', keys.privateKey, new TextEncoder().encode(timestamp + body))).toString('hex');
     return mf.dispatchFetch('https://pilot.example/interactions', { method: 'POST', body,
       headers: { 'X-Signature-Timestamp': timestamp, 'X-Signature-Ed25519': signature } });

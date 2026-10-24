@@ -48,7 +48,15 @@ public sealed partial class MainForm
 
     internal RunnerSettings ReadSettings() => new((HomebaseZone)zone.SelectedItem!, (int)runLimit.Value,
         launchIfMissing.Checked, indefinite.Checked, manualThemeEnabled, manualDarkTheme, targetWave, webhook,
-        endRunWhenTargetReached, waitForAssistance, autoResumeFortnite, autoResumeIdleSeconds, startStopHotkey);
+        endRunWhenTargetReached, waitForAssistance, autoResumeFortnite, autoResumeIdleSeconds, startStopHotkey, closeToTray, startWithWindows);
+    internal void SetLifecycle(bool closeToTray, bool startup)
+    {
+        bool previousStartup = startWithWindows;
+        if (startup != previousStartup) WindowsStartup.SetEnabled(startup);
+        try { settingsStore.Save(ReadSettings() with { CloseToTray = closeToTray, StartWithWindows = startup }); }
+        catch { if (startup != previousStartup) WindowsStartup.SetEnabled(previousStartup); throw; }
+        this.closeToTray = closeToTray; startWithWindows = startup;
+    }
     internal void SetHotkey(string choice)
     {
         var next = ReadSettings() with { StartStopHotkey = choice };
@@ -137,6 +145,8 @@ public sealed partial class MainForm
         targetWave = value.TargetWave;
         endRunWhenTargetReached = value.EndRunWhenTargetReached;
         waitForAssistance = value.WaitForAssistance;
+        closeToTray = value.CloseToTray;
+        startWithWindows = value.StartWithWindows;
         autoResumeFortnite = value.AutoResumeFortnite;
         autoResumeIdleSeconds = value.AutoResumeIdleSeconds;
         ConfigureWebhook(value.Webhook!);

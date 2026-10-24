@@ -230,7 +230,8 @@ static class Program
         using var instance = new Mutex(true, @"Local\EndurancePilot.Runner", out bool firstInstance);
         if (!firstInstance)
         {
-            MessageBox.Show("Endurance Pilot is already open. Use its existing window to start or stop the runner.", "Endurance Pilot", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            try { using var signal = EventWaitHandle.OpenExisting(@"Local\EndurancePilot.Show"); signal.Set(); }
+            catch (WaitHandleCannotBeOpenedException) { MessageBox.Show("Pilot is starting. Try again in a moment.", "Endurance Pilot"); }
             return;
         }
         try

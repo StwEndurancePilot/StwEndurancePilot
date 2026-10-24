@@ -26,6 +26,8 @@ public sealed partial class MainForm : Form
     private int targetWave = 30;
     private bool endRunWhenTargetReached = true;
     private bool waitForAssistance;
+    private bool closeToTray = true;
+    private bool startWithWindows;
     private bool autoResumeFortnite;
     private int autoResumeIdleSeconds;
     private readonly NumericUpDown runLimit = new() { Minimum = 1, Maximum = 100, Value = 1, Width = 60 };
@@ -107,6 +109,8 @@ public sealed partial class MainForm : Form
         targetWave = saved.TargetWave;
         endRunWhenTargetReached = saved.EndRunWhenTargetReached;
         waitForAssistance = saved.WaitForAssistance;
+        closeToTray = saved.CloseToTray;
+        startWithWindows = saved.StartWithWindows;
         autoResumeFortnite = saved.AutoResumeFortnite;
         autoResumeIdleSeconds = saved.AutoResumeIdleSeconds;
         launchIfMissing.Checked = saved.LaunchIfMissing;

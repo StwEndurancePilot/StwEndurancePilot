@@ -26,7 +26,7 @@ internal static class RemoteSecurityChecks
         {
             string timestamp = ((issued ?? now) / 1000).ToString();
             string id = "444444444444444444";
-            object option = action == "switch"
+            object option = action == "switch" && account is not null
                 ? new { name = action, type = 1, options = new[] { new { name = "account", type = 4, value = account } } }
                 : new { name = action, type = 1 };
             string body = JsonSerializer.Serialize(new { id, type = 2, application_id = application, token = "test-only-reply-token", user = new { id = user }, data = new { name = "pilot", options = new[] { option } } });
@@ -35,6 +35,23 @@ internal static class RemoteSecurityChecks
             Ed25519.Sign(seed, 0, data, 0, data.Length, signature, 0);
             return new(id, action, account, (issued ?? now) + 45_000, new(body, Convert.ToHexStringLower(signature), timestamp));
         }
+        RemoteCommand Selection(string user = User, string app = App)
+        {
+            string timestamp = (now / 1000).ToString();
+            string snapshot = new('a', 64);
+            string body = JsonSerializer.Serialize(new { id = "444444444444444444", type = 3, application_id = app,
+                user = new { id = user }, data = new { component_type = 3, custom_id = $"pilot:switch:{snapshot}:0", values = new[] { "2" } } });
+            byte[] bytes = Encoding.UTF8.GetBytes(timestamp + body), signature = new byte[64];
+            Ed25519.Sign(seed, 0, bytes, 0, bytes.Length, signature, 0);
+            return new("444444444444444444", "switch", 2, now + 45_000, new(body, Convert.ToHexStringLower(signature), timestamp), snapshot);
+        }
+        var selection = Selection();
+        Check("Account dropdown verifies Discord signature and snapshot", RemoteCommandProof.Verify(selection, config, now));
+        Check("Account dropdown rejects substituted account", !RemoteCommandProof.Verify(selection with { Account = 1 }, config, now));
+        Check("Account dropdown rejects substituted snapshot", !RemoteCommandProof.Verify(selection with { AccountSet = new string('b', 64) }, config, now));
+        Check("Account dropdown rejects another owner", !RemoteCommandProof.Verify(Selection(user: "222222222222222222"), config, now));
+        Check("Account dropdown rejects another application", !RemoteCommandProof.Verify(Selection(app: "555555555555555555"), config, now));
+        Check("Account menu can be requested without an account number", RemoteCommandProof.Verify(Command(action: "switch"), config, now));
         var command = Command();
         Check("Desktop verifies an authentic Discord command", RemoteCommandProof.Verify(command, config, now));
         Check("Desktop rejects unsigned Worker commands", !RemoteCommandProof.Verify(command with { Proof = null }, config, now));
@@ -112,8 +129,13 @@ internal static class RemoteSecurityChecks
                 Check("Installed settings contain no reusable bearer credential", !handler.PairBody.Contains("token", StringComparison.OrdinalIgnoreCase)
                     && !Encoding.UTF8.GetString(File.ReadAllBytes(configurationPath)).Contains(savedKey));
                 Check("Every authenticated device request is signed", handler.SignaturesValid && handler.SignedCount > 0);
-                using (var duplicate = new DiscordRemote((_, _, _) => throw new Exception("Must never execute"), configurationPath, new Handler(null)))
-                    Check("Second Pilot instance cannot connect to the same pairing", duplicate.Configuration is null && duplicate.Status.Contains("another"));
+                var duplicateHandler = new Handler(null);
+                using (var duplicate = new DiscordRemote((_, _, _) => throw new Exception("Must never execute"), configurationPath, duplicateHandler))
+                {
+                    duplicate.Start();
+                    Check("Second Pilot instance shows saved pairing without opening another connection",
+                        duplicate.Configuration?.KeyName == savedKey && duplicate.Status.Contains("another") && duplicateHandler.SignedCount == 0);
+                }
                 await remote.DisconnectAsync();
                 Check("Local disconnect removes configuration", remote.Configuration is null && !File.Exists(configurationPath));
                 bool missing = false;
@@ -135,16 +157,47 @@ internal static class RemoteSecurityChecks
             foreach (var suffix in new[] { "", ".lock", ".replay" }) if (File.Exists(configurationPath + suffix)) File.Delete(configurationPath + suffix);
             CryptographicOperations.ZeroMemory(seed);
         }
+        // Recreate the connection exactly as a new executable/process does. An old
+        // expiry must not delete the installed pairing or its persisted Windows key.
+        string persistentPath = Path.Combine(directory, "persistent-" + Guid.NewGuid().ToString("N") + ".bin");
+        string persistentKey = RemoteDeviceKey.Create();
+        try
+        {
+            var saved = config with { KeyName = persistentKey, KeyExpires = now - 1 };
+            RemoteReplayJournal.WriteProtected(persistentPath, JsonSerializer.SerializeToUtf8Bytes(saved, Json));
+            byte[] original = File.ReadAllBytes(persistentPath);
+            for (int restart = 0; restart < 2; restart++)
+            {
+                var transport = new Handler(null, RemoteDeviceKey.PublicKey(persistentKey)) { FailPollOnce = restart == 0 };
+                using (var reopened = new DiscordRemote((_, _, _) => throw new Exception("No command expected"), persistentPath, transport))
+                {
+                    Check($"Restart {restart + 1} retains pairing identity and permissions beyond legacy expiry", reopened.Configuration == saved);
+                    reopened.Start();
+                    await transport.Polled.Task.WaitAsync(TimeSpan.FromSeconds(15));
+                    Check($"Restart {restart + 1} resumes authenticated polling without pairing", transport.SignaturesValid && transport.PairBody == "");
+                }
+                Check($"Closing app {restart + 1} preserves pairing file and Windows signing key",
+                    original.SequenceEqual(File.ReadAllBytes(persistentPath)) && RemoteDeviceKey.PublicKey(persistentKey).Length > 0);
+            }
+        }
+        catch (Exception error) { checks.Add(new("Persistent pairing across restarts", false, error.GetType().Name)); }
+        finally
+        {
+            RemoteDeviceKey.Delete(persistentKey);
+            foreach (var suffix in new[] { "", ".lock", ".replay" }) if (File.Exists(persistentPath + suffix)) File.Delete(persistentPath + suffix);
+        }
         return checks;
     }
 
-    private sealed class Handler(Func<RemoteCommand>? command) : HttpMessageHandler
+    private sealed class Handler(Func<RemoteCommand>? command, string? savedPublicKey = null) : HttpMessageHandler
     {
         internal string PairBody = "";
         internal bool SignaturesValid = true;
         internal int SignedCount;
         internal bool FailRevoke;
-        private string? publicKey;
+        internal bool FailPollOnce;
+        private string? publicKey = savedPublicKey;
+        internal TaskCompletionSource Polled = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private bool delivered;
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -168,6 +221,8 @@ internal static class RemoteSecurityChecks
             if (route == "revoke" && FailRevoke) return new(HttpStatusCode.ServiceUnavailable);
             if (route == "poll")
             {
+                if (FailPollOnce) { FailPollOnce = false; return new(HttpStatusCode.Unauthorized); }
+                Polled.TrySetResult();
                 var next = delivered ? null : command?.Invoke();
                 delivered = true;
                 return Response(new { command = next });

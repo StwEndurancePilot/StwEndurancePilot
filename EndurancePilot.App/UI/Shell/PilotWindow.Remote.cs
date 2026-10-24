@@ -31,8 +31,8 @@ public partial class PilotWindow
         {
             var accounts = EpicLauncher.Accounts.All;
             if (accounts.Count == 0) return new("No saved accounts. " + remoteLoginStatus);
-            string text = string.Join("\n", accounts.Select((a, i) => $"{i + 1}. {SafeAccountName(a.DisplayName)}{(EpicLauncher.Accounts.SelectedAccountId == a.AccountId ? " (selected)" : "")}"));
-            return new((text.Length > 1700 ? text[..1700] : text) + "\n" + remoteLoginStatus);
+            string text = string.Join("\n", accounts.Select(a => $"**{SafeAccountName(a.DisplayName)}**{(EpicLauncher.Accounts.SelectedAccountId == a.AccountId ? " · Selected" : "")}"));
+            return new((text.Length > 1700 ? text[..1700] : text) + (remoteLoginStatus == "No remote sign-in pending." ? "" : "\n\n" + remoteLoginStatus));
         }
         if (!config.AllowControl) return new("Game and account controls are disabled on this PC. Change permissions by pairing again locally.");
         switch (command.Command)
@@ -48,6 +48,16 @@ public partial class PilotWindow
                 if (host.Snapshot().Running) host.ToggleRunner();
                 return new("Runner stopped.");
             case "switch":
+                var choices = EpicLauncher.Accounts.All.Take(100).ToArray();
+                string accountSet = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(
+                    System.Text.Json.JsonSerializer.Serialize(choices.Select(a => a.AccountId)))));
+                if (command.Account is null)
+                    return choices.Length == 0 ? new("No saved accounts yet. Use /pilot login to connect one.")
+                        : new("Select the account to use for your next Fortnite launch.", Accounts: choices.Select((a, i) => new RemoteAccountChoice(i + 1,
+                            string.IsNullOrWhiteSpace(SafeAccountName(a.DisplayName)) ? $"Account {i + 1}" : SafeAccountName(a.DisplayName),
+                            EpicLauncher.Accounts.SelectedAccountId == a.AccountId)).ToArray(), AccountSet: accountSet);
+                if (command.AccountSet is not null && command.AccountSet != accountSet)
+                    return new("Your saved accounts have changed. Run /pilot switch again for a fresh list.");
                 if (host.Snapshot().Running || remoteLogin is not null || EpicLauncher.Inspect() is { GamePresent: true } or { BootstrapperPresent: true })
                     return new("Stop the runner, close Fortnite and finish sign-in before switching accounts.");
                 if (command.Account is not { } number || number < 1 || number > EpicLauncher.Accounts.All.Count) return new("Account number is unavailable. Run /pilot accounts again.");

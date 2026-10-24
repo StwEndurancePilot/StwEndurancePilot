@@ -12,6 +12,7 @@ internal static class SettingsChecks
         {
             Check("Missing preferences use defaults", store.Load(out var warning) == new RunnerSettings() && warning is null);
             Check("New installations run indefinitely by default", store.Load(out warning).RunIndefinitely);
+            Check("Closing keeps Pilot in tray by default without enabling Windows startup", store.Load(out warning) is { CloseToTray: true, StartWithWindows: false });
             Check("Default target is wave 30", store.Load(out warning).TargetWave == 30);
             Check("End at target defaults on", store.Load(out warning).EndRunWhenTargetReached);
             Check("Wait for assistance defaults off", !store.Load(out warning).WaitForAssistance);
@@ -19,7 +20,7 @@ internal static class SettingsChecks
             Check("Existing shortcut defaults to F10", store.Load(out warning).StartStopHotkey == "F10"
                 && RunnerHotkey.Resolve("F10") is (0x4000u, 0x79u));
             Check("Modified shortcut maps to Ctrl+Alt+F9", RunnerHotkey.Resolve("Ctrl+Alt+F9") is (0x4003u, 0x78u));
-            var saved = new RunnerSettings(EndurancePilot.Core.HomebaseZone.CannyValley, 3, false, false);
+            var saved = new RunnerSettings(EndurancePilot.Core.HomebaseZone.CannyValley, 3, false, false, CloseToTray: false, StartWithWindows: true);
             store.Save(saved);
             Check("Preferences survive a new store instance", new SettingsStore(path).Load(out warning) == saved && warning is null);
             saved = saved with

@@ -29,7 +29,7 @@ internal static class DiscordPreview
             using var remote = new DiscordRemote((_, _, _) => Task.FromResult(new RemoteResult("Preview")), Path.Combine(Path.GetFullPath(output), "preview-connection.bin"));
             var dialog = new DiscordRemoteDialog(remote);
             var content = (FrameworkElement)dialog.Content;
-            foreach (string state in new[] { "setup", "paired", "advanced" })
+            foreach (string state in new[] { "setup", "paired" })
             {
                 if (state == "paired")
                 {
@@ -41,16 +41,12 @@ internal static class DiscordPreview
                     ((System.Windows.Controls.TextBlock)dialog.FindName("Intro")).Text = "Keep Pilot open on this PC to use your Discord commands.";
                     ((System.Windows.Controls.TextBlock)dialog.FindName("ConnectionTitle")).Text = "Connected to Discord";
                     ((System.Windows.Controls.TextBlock)dialog.FindName("ConnectionDetail")).Text = "Ready for /pilot accounts, /pilot progress and more.";
-                    ((System.Windows.Controls.TextBlock)dialog.FindName("PermissionHint")).Text = "To change permissions, disconnect and pair again.";
-                    foreach (string name in new[] { "AllowControl", "AllowScreenshots", "Advanced" })
-                        ((System.Windows.Controls.Control)dialog.FindName(name)).IsEnabled = false;
+                    ((FrameworkElement)dialog.FindName("PairingNote")).Visibility = Visibility.Collapsed;
                 }
-                if (state == "advanced") ((System.Windows.Controls.Expander)dialog.FindName("Advanced")).IsExpanded = true;
-                int height = state == "advanced" ? 1100 : 780;
-                content.Measure(new System.Windows.Size(524, height));
-                content.Arrange(new Rect(0, 0, 524, height));
-                content.UpdateLayout();
-                var bitmap = new RenderTargetBitmap(524, height, 96, 96, PixelFormats.Pbgra32);
+                content.Measure(new System.Windows.Size(404, double.PositiveInfinity));
+                int height = (int)Math.Ceiling(content.DesiredSize.Height);
+                content.Arrange(new Rect(0, 0, 404, height));                content.UpdateLayout();
+                var bitmap = new RenderTargetBitmap(404, height, 96, 96, PixelFormats.Pbgra32);
                 bitmap.Render(content);
                 var encoder = new PngBitmapEncoder();
                 encoder.Frames.Add(BitmapFrame.Create(bitmap));

@@ -1,10 +1,11 @@
+import { message, accountMenus, selection } from './messages.js';
 import { digest, exact, isHex, isUser, publicKey, verifyDevice } from './device-auth.js';
 export { digest } from './device-auth.js';
 const encoder = new TextEncoder();
 const hex = (value) => Uint8Array.from(value.match(/../g) ?? [], x => parseInt(x, 16));
 const random = (size) => Array.from(crypto.getRandomValues(new Uint8Array(size)), x => x.toString(16).padStart(2, '0')).join('');
 const json = (value, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
-const reply = content => json({ type: 4, data: { content, flags: 64, allowed_mentions: { parse: [] } } });
+const reply = content => json({ type: 4, data: { ...message('notice', content), flags: 64 } });
 const commands = new Set(['progress', 'statistics', 'accounts', 'switch', 'login', 'screenshot', 'menu', 'start', 'stop', 'launch']);
 
 export async function readLimited(request, limit, timeoutMs = 5000) {
@@ -52,7 +53,7 @@ export default {
         if (interaction.application_id !== env.DISCORD_APPLICATION_ID) return json({ error: 'Unauthorized' }, 401);
         if (interaction.type === 1) return json({ type: 1 });
         const user = interaction.member?.user?.id ?? interaction.user?.id;
-        if (!isUser(user) || !isUser(interaction.id) || interaction.type !== 2 || interaction.data?.name !== 'pilot') return reply('Unsupported command.');
+        if (!isUser(user) || !isUser(interaction.id) || !((interaction.type === 2 && ['pilot', 'pair', 'unpair'].includes(interaction.data?.name)) || (interaction.type === 3 && selection(interaction.data)))) return reply('Unsupported command.');
         return await env.DEVICES.get(env.DEVICES.idFromName(user)).fetch(new Request('https://device/interaction', {
           method: 'POST', body: JSON.stringify({ interaction, proof: { body, signature: request.headers.get('X-Signature-Ed25519'), timestamp: request.headers.get('X-Signature-Timestamp') } })
         }));
@@ -87,7 +88,8 @@ export class Device {
     if (path === '/interaction') {
       const { interaction: i, proof } = await request.json();
       const option = i.data.options?.[0];
-      const command = option?.name;
+      const picked = i.type === 3 ? selection(i.data) : null;
+      const command = picked ? 'switch' : i.data.name === 'pair' ? 'pair' : i.data.name === 'unpair' ? 'unlink' : option?.name;
       if (Number(proof.timestamp) * 1000 <= (state.revokedBefore ?? 0)) return reply('Request predates revocation. Send a new command.');
       if (state.seen.some(x => x.id === i.id)) return reply('This request has already been handled.');
       // A signed unlink must remain available even after the command quota is exhausted.
@@ -99,8 +101,8 @@ export class Device {
       state.seen.push({ id: i.id, until: now + 600_000 });
       await this.save(state);
       if (command === 'pair') {
-        if (state.publicKey || state.token) return reply('A PC is already paired. Use /pilot unlink before pairing another.');
-        if (state.pairUntil > now) return reply('A pairing code is already active. Wait five minutes or use /pilot unlink.');
+        if (state.publicKey || state.token) return reply('A PC is already paired. Use /unpair before pairing another.');
+        if (state.pairUntil > now) return reply('A pairing code is already active. Wait five minutes or use /unpair.');
         const code = random(16);
         state.pairHash = await digest(code);
         state.pairUntil = now + 300_000;
@@ -109,24 +111,23 @@ export class Device {
         const user = i.member?.user?.id ?? i.user.id;
         return json({ type: 4, data: { flags: 64, allowed_mentions: { parse: [] }, embeds: [{
           title: 'Connect your PC', color: 0xB52739,
-          description: 'Open **Pilot → account menu → Discord remote control**.\nPaste these values, choose your permissions, then select **Pair this PC**.',
+          description: 'Open **Pilot → account menu → Discord remote control**.\nPaste these two values and select **Pair this PC**.',
           fields: [
             { name: 'Discord user ID', value: `\`\`\`\n${user}\n\`\`\`` },
             { name: 'One-time pairing code', value: `\`\`\`\n${code}\n\`\`\`` },
-            { name: 'Expires', value: `<t:${Math.floor(state.pairUntil / 1000)}:R> · Run \`/pilot unlink\` to cancel.` },
-            { name: 'Your connection', value: this.env.PUBLIC_ORIGIN }
-          ],
-          footer: { text: 'Only pair your own PC. Never share this code.' }
+            { name: 'Expires', value: `<t:${Math.floor(state.pairUntil / 1000)}:R>` }
+          ]
         }] } });
       }
       if (!commands.has(command)) return reply('Unsupported command.');
-      if (!state.publicKey || state.keyExpires <= now || now - (state.lastPoll ?? 0) > 20_000) return reply('Your PC is offline, pairing expired, or remote control is disabled.');
+      if (!state.publicKey || now - (state.lastPoll ?? 0) > 20_000) return reply('Your PC is offline or remote control is disabled. Open Pilot on your paired PC.');
       if (state.pending) return reply('A command is already in progress. Try again shortly.');
       if (now - (state.lastCommand ?? 0) < 3000) return reply('Please wait a few seconds between commands.');
-      const account = option.options?.find(x => x.name === 'account')?.value;
-      if (command === 'switch' && (!Number.isInteger(account) || account < 1 || account > 100)) return reply('Choose an account number from /pilot accounts.');
+      const account = picked?.account ?? option?.options?.find(x => x.name === 'account')?.value;
+      const accountSet = picked?.accountSet;
+      if (command === 'switch' && account !== undefined && (!Number.isInteger(account) || account < 1 || account > 100)) return reply('Choose an account number from /pilot accounts.');
       state.lastCommand = now;
-      state.pending = { id: i.id, command, account, expires: now + 45_000,
+      state.pending = { id: i.id, command, account, accountSet, expires: now + 45_000,
         application: i.application_id, replyToken: i.token, delivered: false, proof };
       await this.save(state);
       return json({ type: 5, data: { flags: 64 } });
@@ -141,11 +142,11 @@ export class Device {
       if (!isHex(body.code, 32) || await digest(body.code) !== state.pairHash || body.token !== undefined) return json({ error: 'Pairing rejected' }, 403);
       try { await publicKey(body.publicKey); } catch { return json({ error: 'Pairing rejected' }, 403); }
       state.publicKey = body.publicKey;
-      state.keyExpires = now + 90 * 24 * 60 * 60 * 1000;
+      delete state.keyExpires;
       state.nonces = [];
       delete state.pairHash; delete state.pairUntil; delete state.attempts;
       await this.save(state);
-      return json({ paired: true, keyExpires: state.keyExpires });
+      return json({ paired: true });
     }
     const nonces = await verifyDevice(request, raw, state, this.env.PUBLIC_ORIGIN, path.slice(1), now);
     if (!nonces) return json({ error: 'Unauthorized' }, 401);
@@ -155,7 +156,7 @@ export class Device {
     if (path === '/poll') {
       state.lastPoll = now;
       const p = state.pending;
-      const command = p && !p.delivered && p.expires > now ? { id: p.id, command: p.command, account: p.account, expires: p.expires, proof: p.proof } : null;
+      const command = p && !p.delivered && p.expires > now ? { id: p.id, command: p.command, account: p.account, accountSet: p.accountSet, expires: p.expires, proof: p.proof } : null;
       if (command) p.delivered = true; // Never replay a mutating command after a lost response.
       await this.save(state);
       return json({ command });
@@ -164,6 +165,11 @@ export class Device {
       const p = state.pending;
       if (!p || !p.delivered || p.resultReceived || p.id !== body.id || p.expires < now) return json({ error: 'Expired request' }, 409);
       if (typeof body.content !== 'string' || body.content.length > 1900) return json({ error: 'Invalid response' }, 400);
+      let menus = [];
+      if (body.accounts != null) {
+        if (p.command !== 'switch' || p.account != null) return json({ error: 'Invalid account menu' }, 400);
+        try { menus = accountMenus(body.accounts, body.accountSet); } catch { return json({ error: 'Invalid account menu' }, 400); }
+      }
       let image;
       if (body.image != null) {
         if (p.command !== 'screenshot' || typeof body.image !== 'string' || body.image.length > 2_800_000) return json({ error: 'Invalid image' }, 400);
@@ -175,7 +181,7 @@ export class Device {
       p.resultReceived = true;
       delete p.proof;
       await this.save(state);
-      try { await this.respond(p, body.content, image); }
+      try { await this.respond(p, body.content, image, menus); }
       catch (error) {
         return json({ error: 'Discord reply delivery failed', discordStatus: error.discordStatus ?? null }, 502);
       }
@@ -191,8 +197,9 @@ export class Device {
     if (deadlines.length) await this.storage.setAlarm(Math.max(Date.now() + 1000, Math.min(...deadlines)));
     else await this.storage.deleteAlarm();
   }
-  async respond(p, content, image) {
-    const payload = { content, allowed_mentions: { parse: [] }, attachments: [] };
+  async respond(p, content, image, menus = []) {
+    const payload = message(p.command, content, !!image);
+    payload.components = menus;
     let body;
     const headers = { 'User-Agent': 'DiscordBot (https://github.com/StwEndurancePilot/StwEndurancePilot, 1.0)' };
     if (image) {

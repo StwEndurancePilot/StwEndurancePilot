@@ -76,7 +76,7 @@ test('pairing stores only a public device key, is single-use, and cannot overwri
   assert.equal(state.pairHash, undefined);
   assert.equal(JSON.stringify(state).includes(code), false);
   assert.equal((await f.device(userA, 'pair', '', { code, token: 'cd'.repeat(32) })).status, 403);
-  assert.match((await f.interaction(userA, 'pair')).data.content, /already paired/);
+  assert.match((await f.interaction(userA, 'pair')).data.embeds[0].description, /already paired/);
 });
 
 test('pairing rejects a wrong user and expires without letting bad guesses lock the owner out', async () => {
@@ -107,16 +107,16 @@ test('device signing keys cannot poll, submit results or revoke another user', a
 test('commands require online PC, replies are private, queued actions deliver once', async () => {
   const f = fixture();
   const { token } = await f.pair(userA);
-  assert.match((await f.interaction(userA, 'start')).data.content, /offline/);
+  assert.match((await f.interaction(userA, 'start')).data.embeds[0].description, /offline/);
   await f.device(userA, 'poll', token);
   const response = await f.interaction(userA, 'start', undefined, 'same-id');
   assert.deepEqual(response, { type: 5, data: { flags: 64 } });
-  assert.match((await f.interaction(userA, 'start', undefined, 'same-id')).data.content, /already been handled/);
+  assert.match((await f.interaction(userA, 'start', undefined, 'same-id')).data.embeds[0].description, /already been handled/);
   const first = await (await f.device(userA, 'poll', token)).json();
   assert.equal(first.command.command, 'start');
   assert.equal(first.command.replyToken, undefined);
   assert.equal((await (await f.device(userA, 'poll', token)).json()).command, null);
-  assert.match((await f.interaction(userA, 'stop')).data.content, /already in progress/);
+  assert.match((await f.interaction(userA, 'stop')).data.embeds[0].description, /already in progress/);
 });
 
 test('expired actions cannot be executed or completed; alarm removes interaction tokens', async () => {
@@ -186,7 +186,7 @@ test('signed device requests bind method destination user route body timestamp a
   assert.equal((await send('poll', raw, { Authorization: 'Bearer ' + 'ab'.repeat(32) })).status, 401);
 });
 
-test('device request replay remains blocked across object recreation and key expiry', async () => {
+test('pairing survives object recreation and legacy expiry while replay and unlink stay enforced', async () => {
   const f = fixture();
   const { key } = await f.pair(userA);
   const headers = await signedHeaders(key, userA, 'poll', '{}');
@@ -196,6 +196,9 @@ test('device request replay remains blocked across object recreation and key exp
   const restarted = new Device(entry.device.ctx, f.env);
   assert.equal((await restarted.fetch(request())).status, 401);
   entry.state().keyExpires = Date.now() - 1;
+  assert.equal((await f.device(userA, 'poll', 'ab'.repeat(32))).status, 200);
+  assert.equal((await f.interaction(userA, 'progress')).type, 5);
+  await f.interaction(userA, 'unlink');
   assert.equal((await f.device(userA, 'poll', 'ab'.repeat(32))).status, 401);
 });
 
@@ -204,12 +207,12 @@ test('unlink bypasses full command quota and rejects older signed pairing reques
   await f.pair(userA);
   const entry = f.instances.get(userA);
   entry.state().seen = Array.from({ length: 100 }, (_, n) => ({ id: `flood-${n}`, until: Date.now() + 600_000 }));
-  assert.match((await f.interaction(userA, 'unlink')).data.content, /revoked/);
+  assert.match((await f.interaction(userA, 'unlink')).data.embeds[0].description, /revoked/);
   assert.equal(entry.state().publicKey, undefined);
   const response = await entry.device.fetch(new Request('https://device/interaction', { method: 'POST', body: JSON.stringify({
     interaction: { id: 'old', data: { options: [{ name: 'pair' }] } }, proof: { timestamp: String(Math.floor(Date.now() / 1000) - 1) }
   }) }));
-  assert.match((await response.json()).data.content, /predates revocation/);
+  assert.match((await response.json()).data.embeds[0].description, /predates revocation/);
 });
 
 test('slow body times out without waiting for the sender to close the stream', async () => {
@@ -254,8 +257,8 @@ test('failed Discord delivery preserves a bounded fallback without retaining res
     assert.match(init.headers['User-Agent'], /^DiscordBot /);
     const payload = JSON.parse(init.body);
     if (++calls === 1) return new Response('private upstream details', { status: 403 });
-    assert.match(payload.content, /PC handled this command/);
-    assert.equal(payload.content.includes('private account result'), false);
+    assert.match(payload.embeds[0].description, /PC handled this command/);
+    assert.equal(payload.embeds[0].description.includes('private account result'), false);
     return new Response('', { status: 200 });
   });
   const response = await f.device(userA, 'result', token, { id: command.id, content: 'private account result' });
@@ -286,4 +289,30 @@ test('network failure retains the command deadline for a fallback reply', async 
   assert.equal((await response.json()).discordStatus, null);
   assert.equal(f.instances.get(userA).state().pending.expires, command.expires);
   assert.ok(f.instances.get(userA).alarm());
+});
+
+test('switch returns live choices without storing account names and queues a bound selection', async () => {
+  const f = fixture();
+  const { token } = await f.pair(userA);
+  await f.device(userA, 'poll', token);
+  await f.interaction(userA, 'switch');
+  const { command } = await (await f.device(userA, 'poll', token)).json();
+  assert.equal(command.account, undefined);
+  const entry = f.instances.get(userA);
+  let menu;
+  entry.device.respond = async (_, content, image, menus) => { menu = menus; };
+  const snapshot = 'a'.repeat(64);
+  assert.equal((await f.device(userA, 'result', token, { id: command.id, content: 'Choose an account', accounts: [{ number: 1, name: 'Private saved account', selected: true }], accountSet: snapshot })).status, 200);
+  assert.equal(menu[0].components[0].options[0].label, 'Private saved account');
+  assert.equal(JSON.stringify(entry.state()).includes('Private saved account'), false);
+  entry.state().lastCommand = 0;
+  const response = await entry.device.fetch(new Request('https://device/interaction', { method: 'POST', body: JSON.stringify({
+    interaction: { type: 3, id: String(++sequence), application_id: app, token: 'selection-token', user: { id: userA }, data: { component_type: 3, custom_id: menu[0].components[0].custom_id, values: ['1'] } },
+    proof: { timestamp: String(Math.floor(Date.now()/1000)+1), body: '{}', signature: 'test' }
+  }) }));
+  assert.equal((await response.json()).type, 5);
+  const selected = (await (await f.device(userA, 'poll', token)).json()).command;
+  assert.equal(selected.command, 'switch');
+  assert.equal(selected.account, 1);
+  assert.equal(selected.accountSet, snapshot);
 });

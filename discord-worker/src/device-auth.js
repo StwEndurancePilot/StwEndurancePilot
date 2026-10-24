@@ -13,7 +13,8 @@ export async function publicKey(value) {
 }
 
 export async function verifyDevice(request, body, state, origin, route, now) {
-  if (!state.publicKey || !isUser(state.user) || state.keyExpires <= now) return null;
+  // Legacy keyExpires values are ignored; unlink/revoke removes the public key.
+  if (!state.publicKey || !isUser(state.user)) return null;
   const timestamp = request.headers.get('X-Pilot-Timestamp');
   const nonce = request.headers.get('X-Pilot-Nonce');
   const signature = request.headers.get('X-Pilot-Signature');

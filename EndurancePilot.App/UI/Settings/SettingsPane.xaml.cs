@@ -5,6 +5,21 @@ namespace EndurancePilot.App;
 
 public partial class SettingsPane : System.Windows.Controls.UserControl
 {
+    internal void ConfigureLifecycle(RunnerSettings settings, Func<bool, bool, string?> save)
+    {
+        bool close = settings.CloseToTray, startup = settings.StartWithWindows, changing = false;
+        CloseToTrayToggle.IsChecked = close; StartupToggle.IsChecked = startup;
+        void Changed(object sender, RoutedEventArgs e)
+        {
+            if (changing) return;
+            string? error = save(CloseToTrayToggle.IsChecked == true, StartupToggle.IsChecked == true);
+            if (error is null) { close = CloseToTrayToggle.IsChecked == true; startup = StartupToggle.IsChecked == true; }
+            else { changing = true; CloseToTrayToggle.IsChecked = close; StartupToggle.IsChecked = startup; changing = false; }
+            SaveStatus.Text = error ?? "Settings saved.";
+        }
+        CloseToTrayToggle.Checked += Changed; CloseToTrayToggle.Unchecked += Changed;
+        StartupToggle.Checked += Changed; StartupToggle.Unchecked += Changed;
+    }
     public event EventHandler? BackRequested;
     private readonly Func<bool, string?> saveLaunch;
     private readonly Func<bool, string?> saveManualTheme;
