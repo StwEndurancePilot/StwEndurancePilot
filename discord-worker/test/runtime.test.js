@@ -41,7 +41,7 @@ for (const discordStatus of [200, 302]) test(`Cloudflare runtime: pairing, isola
     assert.equal((await interaction('pair', '444444444444444444')).status, 401);
     const pairing = await (await interaction('pair')).json();
     assert.equal(pairing.data.flags, 64);
-    const code = /Pairing code: ([a-f0-9]+)/.exec(pairing.data.content)[1];
+    const code = pairing.data.embeds[0].fields.find(x => x.name === 'One-time pairing code').value.match(/[a-f0-9]{32}/)[0];
     const tokens = await Promise.all([identity(), identity()]);
     const claims = await Promise.all(tokens.map(key => device('pair', null, { code, publicKey: key.publicKey })));
     assert.deepEqual(claims.map(r => r.status).sort(), [200, 403]);

@@ -95,6 +95,11 @@ static class Program
             SettingsPreview.Render(args[1]);
             return;
         }
+        if (args.Length == 2 && args[0] == "--preview-discord")
+        {
+            DiscordPreview.Render(args[1]);
+            return;
+        }
         if (args.Length == 2 && args[0] == "--preview-accounts")
         {
             AccountsPreview.Render(args[1]);

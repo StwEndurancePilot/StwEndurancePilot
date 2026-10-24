@@ -39,7 +39,7 @@ function fixture() {
   }
   async function pair(user, token = 'ab'.repeat(32)) {
     const reply = await interaction(user, 'pair');
-    const code = /Pairing code: ([a-f0-9]+)/.exec(reply.data.content)[1];
+    const code = reply.data.embeds[0].fields.find(x => x.name === 'One-time pairing code').value.match(/[a-f0-9]{32}/)[0];
     const key = await identity();
     keys.set(token, key); // Labels in tests refer to distinct signing identities, not bearer credentials.
     assert.equal((await device(user, 'pair', '', { code, publicKey: key.publicKey })).status, 200);
@@ -82,7 +82,11 @@ test('pairing stores only a public device key, is single-use, and cannot overwri
 test('pairing rejects a wrong user and expires without letting bad guesses lock the owner out', async () => {
   const f = fixture();
   const message = await f.interaction(userA, 'pair');
-  const code = /Pairing code: ([a-f0-9]+)/.exec(message.data.content)[1];
+  assert.equal(message.data.flags, 64);
+  assert.deepEqual(message.data.allowed_mentions, { parse: [] });
+  assert.equal(message.data.embeds[0].title, 'Connect your PC');
+  assert.match(message.data.embeds[0].fields.find(x => x.name === 'Expires').value, /<t:\d+:R>/);
+  const code = message.data.embeds[0].fields.find(x => x.name === 'One-time pairing code').value.match(/[a-f0-9]{32}/)[0];
   const key = await identity();
   assert.equal((await f.device(userB, 'pair', '', { code, publicKey: key.publicKey })).status, 403);
   for (let n = 0; n < 5; n++) assert.equal((await f.device(userA, 'pair', '', { code: 'bad', publicKey: key.publicKey })).status, 403);

@@ -107,7 +107,17 @@ export class Device {
         state.user = i.member?.user?.id ?? i.user.id;
         await this.save(state);
         const user = i.member?.user?.id ?? i.user.id;
-        return reply(`In Pilot, open the account menu → Discord remote control. Enter this Worker address: ${this.env.PUBLIC_ORIGIN}\nDiscord user ID: ${user}\nPairing code: ${code}\nExpires in five minutes. Only enter this on your own PC. Never share the code.`);
+        return json({ type: 4, data: { flags: 64, allowed_mentions: { parse: [] }, embeds: [{
+          title: 'Connect your PC', color: 0xB52739,
+          description: 'Open **Pilot → account menu → Discord remote control**.\nPaste these values, choose your permissions, then select **Pair this PC**.',
+          fields: [
+            { name: 'Discord user ID', value: `\`\`\`\n${user}\n\`\`\`` },
+            { name: 'One-time pairing code', value: `\`\`\`\n${code}\n\`\`\`` },
+            { name: 'Expires', value: `<t:${Math.floor(state.pairUntil / 1000)}:R> · Run \`/pilot unlink\` to cancel.` },
+            { name: 'Your connection', value: this.env.PUBLIC_ORIGIN }
+          ],
+          footer: { text: 'Only pair your own PC. Never share this code.' }
+        }] } });
       }
       if (!commands.has(command)) return reply('Unsupported command.');
       if (!state.publicKey || state.keyExpires <= now || now - (state.lastPoll ?? 0) > 20_000) return reply('Your PC is offline, pairing expired, or remote control is disabled.');

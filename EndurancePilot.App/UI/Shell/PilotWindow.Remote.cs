@@ -17,7 +17,7 @@ public partial class PilotWindow
     {
         AccountPopup.IsOpen = false;
         if (remote is null) return;
-        using var dialog = new DiscordRemoteDialog(remote);
+        var dialog = new DiscordRemoteDialog(remote) { Owner = this };
         dialog.ShowDialog();
     }
 
