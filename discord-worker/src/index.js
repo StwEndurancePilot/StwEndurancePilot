@@ -58,18 +58,19 @@ export default {
           method: 'POST', body: JSON.stringify({ interaction, proof: { body, signature: request.headers.get('X-Signature-Ed25519'), timestamp: request.headers.get('X-Signature-Timestamp') } })
         }));
       }
-      const route = /^\/device\/(\d{17,20})\/(pair|poll|result|revoke)$/.exec(url.pathname);
-      if (!route || request.method !== 'POST') return json({ error: 'Not found' }, 404);
+      const route = /^\/device\/(\d{17,20})\/(pair|poll|result|revoke|connect)$/.exec(url.pathname);
+      if (!route || request.method !== (route[2] === 'connect' ? 'GET' : 'POST') || (route[2] === 'connect' && request.headers.get('Upgrade')?.toLowerCase() !== 'websocket')) return json({ error: 'Not found' }, 404);
       // Cloudflare supplies this header. Do not persist or log addresses.
       if (!(await env.DEVICE_RATE_LIMIT.limit({ key: request.headers.get('CF-Connecting-IP') ?? 'unknown' })).success)
         return json({ error: 'Too many requests' }, 429);
       // Read with a deadline BEFORE entering the per-user object lock. Slow unauthenticated
       // uploads must not block the user's revocation/commands inside the Durable Object.
-      const body = await readLimited(request, route[2] === 'result' ? 2_850_000 : 2048);
+      const body = route[2] === 'connect' ? '' : await readLimited(request, route[2] === 'result' ? 2_850_000 : 2048);
       const headers = new Headers();
       for (const key of ['X-Pilot-Timestamp', 'X-Pilot-Nonce', 'X-Pilot-Signature'])
         if (request.headers.has(key)) headers.set(key, request.headers.get(key));
-      return await env.DEVICES.get(env.DEVICES.idFromName(route[1])).fetch(new Request(`https://device/${route[2]}`, { method: 'POST', headers, body }));
+      if (route[2] === 'connect') headers.set('Upgrade', 'websocket');
+      return await env.DEVICES.get(env.DEVICES.idFromName(route[1])).fetch(new Request(`https://device/${route[2]}`, { method: request.method, headers, ...(request.method === 'POST' ? { body } : {}) }));
     } catch { return json({ error: 'Request rejected' }, 400); }
   }
 };
@@ -95,6 +96,7 @@ export class Device {
       // A signed unlink must remain available even after the command quota is exhausted.
       if (command === 'unlink') {
         await this.save({ seen: [{ id: i.id, until: now + 600_000 }], revokedBefore: now });
+        this.closeSockets();
         return reply('Disconnected. Device access has been revoked.');
       }
       if (state.seen.length >= 100) return reply('Too many requests. Try again shortly.');
@@ -119,7 +121,7 @@ export class Device {
         }] } });
       }
       if (!commands.has(command)) return reply('Unsupported command.');
-      if (!state.publicKey || now - (state.lastPoll ?? 0) > 20_000) return reply('Your PC is offline or remote control is disabled. Open Pilot on your paired PC.');
+      if (!state.publicKey || (!this.socket(state) && now - (state.lastPoll ?? 0) > 20_000)) return reply('Your PC is offline or remote control is disabled. Open Pilot on your paired PC.');
       if (state.pending) return reply('A command is already in progress. Try again shortly.');
       if (now - (state.lastCommand ?? 0) < 3000) return reply('Please wait a few seconds between commands.');
       const account = picked?.account ?? option?.options?.find(x => x.name === 'account')?.value;
@@ -128,11 +130,11 @@ export class Device {
       state.lastCommand = now;
       state.pending = { id: i.id, command, account, accountSet, expires: now + 45_000,
         application: i.application_id, replyToken: i.token, delivered: false, proof };
-      await this.save(state);
+      await this.deliver(state);
       return json({ type: 5, data: { flags: 64 } });
     }
     const raw = await request.text();
-    const body = JSON.parse(raw);
+    const body = path === '/connect' ? {} : JSON.parse(raw);
     if (!body || typeof body !== 'object' || Array.isArray(body)) return json({ error: 'Invalid request' }, 400);
     if (path === '/pair') {
       if (state.publicKey || state.token || !state.pairHash || state.pairUntil <= now) return json({ error: 'Pairing rejected' }, 403);
@@ -151,7 +153,17 @@ export class Device {
     if (!nonces) return json({ error: 'Unauthorized' }, 401);
     state.nonces = nonces;
     await this.storage.put('state', state);
-    if (path === '/revoke') { await this.save({ seen: [], revokedBefore: now }); return json({ revoked: true }); }
+    if (path === '/revoke') { await this.save({ seen: [], revokedBefore: now }); this.closeSockets(); return json({ revoked: true }); }
+    if (path === '/connect') {
+      if (request.method !== 'GET' || request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') return json({ error: 'Invalid upgrade' }, 400);
+      const pair = new WebSocketPair();
+      this.closeSockets();
+      this.ctx.acceptWebSocket(pair[1]);
+      pair[1].serializeAttachment({ key: state.publicKey });
+      pair[1].send(JSON.stringify({ ready: true }));
+      await this.deliver(state);
+      return new Response(null, { status: 101, webSocket: pair[0] });
+    }
     if (path === '/poll') {
       state.lastPoll = now;
       const p = state.pending;
@@ -195,6 +207,27 @@ export class Device {
     }
     return json({ error: 'Not found' }, 404);
   }
+  socket(state) {
+    return (this.ctx.getWebSockets?.() ?? []).find(ws => ws.readyState === 1 && ws.deserializeAttachment()?.key === state.publicKey);
+  }
+  closeSockets() {
+    for (const ws of this.ctx.getWebSockets?.() ?? []) {
+      if (ws.readyState === 1) ws.send(JSON.stringify({ disconnected: true }));
+      ws.close(1000, 'Connection replaced or revoked');
+    }
+  }
+  async deliver(state) {
+    const ws = this.socket(state), p = state.pending;
+    const command = ws && p && !p.delivered && p.expires > Date.now()
+      ? { id: p.id, command: p.command, account: p.account, accountSet: p.accountSet, expires: p.expires, proof: p.proof } : null;
+    if (command) p.delivered = true;
+    // Persist delivery before sending: reconnect must never repeat a PC action.
+    await this.save(state);
+    if (command) { try { ws.send(JSON.stringify({ command })); } catch { ws.close(1011, 'Delivery failed'); } }
+  }
+  webSocketMessage(ws) { ws.close(1008, 'Commands are server initiated'); }
+  webSocketClose(ws, code) { ws.close(code === 1005 ? 1000 : code); }
+  webSocketError(ws) { ws.close(1011, 'Connection lost'); }
   async save(state) {
     await this.storage.put('state', state);
     const deadlines = [state.pending?.expires, state.pairUntil, ...state.seen.map(x => x.until)].filter(Boolean);

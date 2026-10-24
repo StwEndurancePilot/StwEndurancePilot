@@ -53,6 +53,7 @@ internal static class RemoteChecks
         Check("Discord rejects malformed bundled public key", DiscordPublicSettings.Parse(publicSettings with { PublicKey = "not-a-key" }) is null);
         Check("Discord rejects insecure bundled endpoint", DiscordPublicSettings.Parse(publicSettings with { WorkerOrigin = "http://pilot.example" }) is null);
         Check("Discord rejects invalid bundled application ID", DiscordPublicSettings.Parse(publicSettings with { ApplicationId = "../user" }) is null);
+        checks.AddRange(RemoteSocketChecks.Run());
         return checks;
     }
 }

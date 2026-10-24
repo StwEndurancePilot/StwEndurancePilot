@@ -35,10 +35,10 @@ internal static class RemoteDeviceKey
         using var signer = new ECDsaCng(key);
         return Convert.ToBase64String(signer.ExportSubjectPublicKeyInfo());
     }
-    internal static string Sign(string name, string origin, string user, string route, string body, string timestamp, string nonce)
+    internal static string Sign(string name, string origin, string user, string route, string body, string timestamp, string nonce, string method = "POST")
     {
         string hash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(body)));
-        var data = Encoding.UTF8.GetBytes($"pilot-device-v2\nPOST\n{origin}/device/{user}/{route}\n{timestamp}\n{nonce}\n{hash}");
+        var data = Encoding.UTF8.GetBytes($"pilot-device-v2\n{method}\n{origin}/device/{user}/{route}\n{timestamp}\n{nonce}\n{hash}");
         using var key = Open(name);
         using var signer = new ECDsaCng(key);
         return Convert.ToHexStringLower(signer.SignData(data, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation));

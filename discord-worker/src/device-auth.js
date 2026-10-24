@@ -13,6 +13,7 @@ export async function publicKey(value) {
 }
 
 export async function verifyDevice(request, body, state, origin, route, now) {
+  if (request.method !== (route === 'connect' ? 'GET' : 'POST')) return null;
   // Legacy keyExpires values are ignored; unlink/revoke removes the public key.
   if (!state.publicKey || !isUser(state.user)) return null;
   const timestamp = request.headers.get('X-Pilot-Timestamp');
@@ -22,7 +23,7 @@ export async function verifyDevice(request, body, state, origin, route, now) {
       !isHex(nonce, 32) || !isHex(signature, 128)) return null;
   const nonces = (state.nonces ?? []).filter(x => x.until > now);
   if (nonces.length >= 128 || nonces.some(x => x.value === nonce)) return null;
-  const message = `pilot-device-v2\nPOST\n${origin}/device/${state.user}/${route}\n${timestamp}\n${nonce}\n${await digest(body)}`;
+  const message = `pilot-device-v2\n${route === 'connect' ? 'GET' : 'POST'}\n${origin}/device/${state.user}/${route}\n${timestamp}\n${nonce}\n${await digest(body)}`;
   try {
     if (!await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, await publicKey(state.publicKey), fromHex(signature), encoder.encode(message))) return null;
   } catch { return null; }

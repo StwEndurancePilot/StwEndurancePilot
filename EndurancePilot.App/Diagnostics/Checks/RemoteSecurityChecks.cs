@@ -1,3 +1,5 @@
+using System.IO.Pipes;
+using System.Net.WebSockets;
 using System.Net;
 using System.Net.Http;
 using System.Security.Cryptography;
@@ -130,7 +132,8 @@ internal static class RemoteSecurityChecks
             using (var remote = new DiscordRemote((_, _, _) => { executed++; finished.TrySetResult(); return Task.FromResult(new RemoteResult("done")); }, configurationPath, handler))
             {
                 await remote.PairAsync(config.Origin, User, new string('a', 32), false, false, App, config.DiscordPublicKey);
-                await finished.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                try { await finished.Task.WaitAsync(TimeSpan.FromSeconds(5)); }
+                catch (TimeoutException) { checks.Add(new("WebSocket connection diagnostic", false, remote.LastCommandStatus)); throw; }
                 Check("Desktop executes an authenticated command through the connection", executed == 1);
                 string savedKey = remote.Configuration!.KeyName;
                 Check("Installed settings contain no reusable bearer credential", !handler.PairBody.Contains("token", StringComparison.OrdinalIgnoreCase)
@@ -180,8 +183,8 @@ internal static class RemoteSecurityChecks
                 {
                     Check($"Restart {restart + 1} retains pairing identity and permissions beyond legacy expiry", reopened.Configuration == saved);
                     reopened.Start();
-                    await transport.Polled.Task.WaitAsync(TimeSpan.FromSeconds(15));
-                    Check($"Restart {restart + 1} resumes authenticated polling without pairing", transport.SignaturesValid && transport.PairBody == "");
+                    await transport.Polled.Task.WaitAsync(TimeSpan.FromSeconds(20));
+                    Check($"Restart {restart + 1} resumes authenticated WebSocket without pairing", transport.SignaturesValid && transport.PairBody == "");
                 }
                 Check($"Closing app {restart + 1} preserves pairing file and Windows signing key",
                     original.SequenceEqual(File.ReadAllBytes(persistentPath)) && RemoteDeviceKey.PublicKey(persistentKey).Length > 0);
@@ -206,9 +209,11 @@ internal static class RemoteSecurityChecks
         private string? publicKey = savedPublicKey;
         internal TaskCompletionSource Polled = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private bool delivered;
+        private readonly List<WebSocket> sockets = [];
+        protected override void Dispose(bool disposing) { foreach (var socket in sockets) socket.Dispose(); base.Dispose(disposing); }
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            string raw = await request.Content!.ReadAsStringAsync(cancellationToken);
+            string raw = request.Content is null ? "" : await request.Content.ReadAsStringAsync(cancellationToken);
             string route = request.RequestUri!.Segments[^1];
             if (route == "pair")
             {
@@ -220,22 +225,55 @@ internal static class RemoteSecurityChecks
             string timestamp = request.Headers.GetValues("X-Pilot-Timestamp").Single();
             string nonce = request.Headers.GetValues("X-Pilot-Nonce").Single();
             string signature = request.Headers.GetValues("X-Pilot-Signature").Single();
-            string message = $"pilot-device-v2\nPOST\n{request.RequestUri.AbsoluteUri}\n{timestamp}\n{nonce}\n{Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(raw)))}";
+            string origin = request.RequestUri.AbsoluteUri.Replace("wss://", "https://");
+            string message = $"pilot-device-v2\n{request.Method}\n{origin}\n{timestamp}\n{nonce}\n{Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(raw)))}";
             using var key = ECDsa.Create();
             key.ImportSubjectPublicKeyInfo(Convert.FromBase64String(publicKey!), out _);
             SignaturesValid &= request.Headers.Authorization is null && key.VerifyData(Encoding.UTF8.GetBytes(message), Convert.FromHexString(signature), HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
             SignedCount++;
             if (route == "revoke" && FailRevoke) return new(HttpStatusCode.ServiceUnavailable);
-            if (route == "poll")
+            if (route == "connect")
             {
                 if (FailPollOnce) { FailPollOnce = false; return new(HttpStatusCode.Unauthorized); }
                 Polled.TrySetResult();
                 var next = delivered ? null : command?.Invoke();
                 delivered = true;
-                return Response(new { command = next });
+                string name = "pilot-ws-test-" + Guid.NewGuid().ToString("N");
+                var server = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                var client = new NamedPipeClientStream(".", name, PipeDirection.InOut, PipeOptions.Asynchronous);
+                var accepted = server.WaitForConnectionAsync(cancellationToken);
+                await client.ConnectAsync(cancellationToken);
+                await accepted;
+                var socket = WebSocket.CreateFromStream(server, true, null, Timeout.InfiniteTimeSpan);
+                sockets.Add(socket);
+                _ = SendFramesAsync(socket, next, cancellationToken);
+                var response = new HttpResponseMessage(HttpStatusCode.SwitchingProtocols) { Content = new DuplexContent(client) };
+                response.Headers.TryAddWithoutValidation("Connection", "Upgrade");
+                response.Headers.TryAddWithoutValidation("Upgrade", "websocket");
+                string accept = Convert.ToBase64String(SHA1.HashData(Encoding.ASCII.GetBytes(request.Headers.GetValues("Sec-WebSocket-Key").Single() + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")));
+                response.Headers.TryAddWithoutValidation("Sec-WebSocket-Accept", accept);
+                return response;
             }
             return Response(new { accepted = true });
         }
+        private static async Task SendFramesAsync(WebSocket socket, RemoteCommand? command, CancellationToken token)
+        {
+            try
+            {
+                await socket.SendAsync(Encoding.UTF8.GetBytes("{\"ready\":true}"), WebSocketMessageType.Text, true, token);
+                if (command is not null) await socket.SendAsync(JsonSerializer.SerializeToUtf8Bytes(new { command }, Json), WebSocketMessageType.Text, true, token);
+            }
+            catch (Exception error) when (error is OperationCanceledException or ObjectDisposedException or WebSocketException or IOException) { }
+        }
         private static HttpResponseMessage Response(object value) => new(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(value, Json), Encoding.UTF8, "application/json") };
+    }
+
+    private sealed class DuplexContent(Stream stream) : HttpContent
+    {
+        protected override Stream CreateContentReadStream(CancellationToken token) => stream;
+        protected override Task<Stream> CreateContentReadStreamAsync() => Task.FromResult(stream);
+        protected override Task SerializeToStreamAsync(Stream target, TransportContext? context) => throw new NotSupportedException();
+        protected override bool TryComputeLength(out long length) { length = 0; return false; }
+        protected override void Dispose(bool disposing) { if (disposing) stream.Dispose(); base.Dispose(disposing); }
     }
 }

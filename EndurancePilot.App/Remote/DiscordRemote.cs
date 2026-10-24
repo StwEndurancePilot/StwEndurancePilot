@@ -1,4 +1,5 @@
 using System.Net.Http;
+using System.Net.WebSockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -20,6 +21,7 @@ internal sealed class DiscordRemote : IDisposable
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private readonly string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EndurancePilot", "discord-remote.bin");
     private readonly HttpClient http;
+    private readonly HttpMessageInvoker socketHttp;
     private readonly RemoteReplayJournal replay;
     private readonly SemaphoreSlim configurationGate = new(1, 1);
     private readonly CancellationTokenSource shutdown = new();
@@ -39,7 +41,9 @@ internal sealed class DiscordRemote : IDisposable
         this.execute = execute;
         if (configurationPath is not null) path = configurationPath;
         replay = new(path + ".replay");
-        http = new(handler ?? new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false })
+        handler ??= new SocketsHttpHandler { AllowAutoRedirect = false, UseCookies = false };
+        socketHttp = new(handler, disposeHandler: false);
+        http = new(handler)
             { Timeout = TimeSpan.FromSeconds(25), MaxResponseContentBufferSize = 200_000 };
         // One process per configuration, including across Windows sessions for the same user.
         try
@@ -178,75 +182,100 @@ internal sealed class DiscordRemote : IDisposable
 
     private async Task RunAsync(RemoteConfiguration config, CancellationToken token)
     {
+        int failures = 0;
         while (!token.IsCancellationRequested)
         {
             try
             {
-                using var response = await SendAsync(config, "poll", new { }, token);
-                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                using var socket = new ClientWebSocket();
+                socket.Options.KeepAliveInterval = TimeSpan.FromSeconds(30);
+                socket.Options.KeepAliveTimeout = TimeSpan.FromSeconds(60);
+                string timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
+                string nonce = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(16));
+                socket.Options.SetRequestHeader("X-Pilot-Timestamp", timestamp);
+                socket.Options.SetRequestHeader("X-Pilot-Nonce", nonce);
+                socket.Options.SetRequestHeader("X-Pilot-Signature", RemoteDeviceKey.Sign(config.KeyName, config.Origin, config.UserId, "connect", "", timestamp, nonce, "GET"));
+                // Explicit handler disables redirects: never forward authentication to another host.
+                using (var handshake = CancellationTokenSource.CreateLinkedTokenSource(token))
                 {
-                    // A 401 can also mean clock skew after sleep or a transient authentication
-                    // failure. Keep the saved key and retry; never execute an untrusted command.
-                    Status = "Connection not authorized; retrying. If you used /unpair, disconnect here and pair again.";
-                    ConnectionStopped?.Invoke();
-                    await Task.Delay(TimeSpan.FromSeconds(10), token);
-                    continue;
+                    handshake.CancelAfter(TimeSpan.FromSeconds(15));
+                    await socket.ConnectAsync(new Uri(config.Origin.Replace("https://", "wss://") + $"/device/{config.UserId}/connect"), socketHttp, handshake.Token);
                 }
-                response.EnsureSuccessStatusCode();
-                // A Worker response should be tiny; do not deserialize unbounded remote data.
-                var bytes = await response.Content.ReadAsByteArrayAsync(token);
-                if (bytes.Length > 200_000) throw new InvalidDataException();
-                using var document = JsonDocument.Parse(bytes);
-                Status = "Connected";
-                if (document.RootElement.GetProperty("command") is { ValueKind: JsonValueKind.Object } value)
+                while (!token.IsCancellationRequested)
                 {
-                    var command = value.Deserialize<RemoteCommand>(Json)!;
-                    var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                    if (!RemoteCommandProof.Verify(command, config, now))
+                    using var document = JsonDocument.Parse(await ReceiveCommandAsync(socket, token));
+                    if (document.RootElement.TryGetProperty("disconnected", out _))
+                        throw new InvalidDataException("Connection replaced or revoked.");
+                    if (document.RootElement.TryGetProperty("ready", out var ready) && ready.ValueKind == JsonValueKind.True)
                     {
-                        LastCommandStatus = "Command rejected: Discord proof did not match this pairing or its time window.";
-                        throw new InvalidDataException("Command proof rejected.");
+                        failures = 0;
+                        Status = "Connected";
+                        continue;
                     }
-                    if (replay.TryAccept(command.Id, now))
+                    if (document.RootElement.GetProperty("command") is { ValueKind: JsonValueKind.Object } value)
                     {
-                        LastCommandStatus = "Command verified; waiting for the desktop action to finish.";
-                        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
-                        deadline.CancelAfter(TimeSpan.FromMilliseconds(command.Expires - now));
-                        RemoteResult result;
-                        try
+                        var command = value.Deserialize<RemoteCommand>(Json)!;
+                        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                        if (!RemoteCommandProof.Verify(command, config, now))
                         {
-                            result = RemotePermissions.Allows(command.Command, config)
-                                ? await execute(command, config, deadline.Token)
-                                : new("This command is not permitted by this PC. Change permissions by pairing again locally.");
+                            LastCommandStatus = "Command rejected: Discord proof did not match this pairing or its time window.";
+                            throw new InvalidDataException("Command proof rejected.");
                         }
-                        catch (OperationCanceledException) when (token.IsCancellationRequested) { return; }
-                        catch { result = new("Action could not be completed. Check Pilot on your PC."); }
-                        token.ThrowIfCancellationRequested();
-                        LastCommandStatus = "Desktop action finished; sending reply.";
-                        try
+                        if (replay.TryAccept(command.Id, now))
                         {
-                            using var sent = await SendAsync(config, "result", new { id = command.Id, content = result.Content, image = result.Image, accounts = result.Accounts, accountSet = result.AccountSet }, token);
-                            LastCommandStatus = await DescribeReplyAsync(sent, token);
-                            if (!sent.IsSuccessStatusCode) Status = "Reply was not delivered. Check Discord before repeating an action.";
+                            LastCommandStatus = "Command verified; waiting for the desktop action to finish.";
+                            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
+                            deadline.CancelAfter(TimeSpan.FromMilliseconds(command.Expires - now));
+                            RemoteResult result;
+                            try
+                            {
+                                result = RemotePermissions.Allows(command.Command, config)
+                                    ? await execute(command, config, deadline.Token)
+                                    : new("This command is not permitted by this PC. Change permissions by pairing again locally.");
+                            }
+                            catch (OperationCanceledException) when (token.IsCancellationRequested) { return; }
+                            catch { result = new("Action could not be completed. Check Pilot on your PC."); }
+                            token.ThrowIfCancellationRequested();
+                            LastCommandStatus = "Desktop action finished; sending reply.";
+                            try
+                            {
+                                using var sent = await SendAsync(config, "result", new { id = command.Id, content = result.Content, image = result.Image, accounts = result.Accounts, accountSet = result.AccountSet }, token);
+                                LastCommandStatus = await DescribeReplyAsync(sent, token);
+                                if (!sent.IsSuccessStatusCode) Status = "Reply was not delivered. Check Discord before repeating an action.";
+                            }
+                            catch
+                            {
+                                LastCommandStatus = "Desktop action finished, but reply delivery timed out or the connection failed. Check Pilot before repeating it.";
+                                throw;
+                            }
                         }
-                        catch
-                        {
-                            LastCommandStatus = "Desktop action finished, but reply delivery timed out or the connection failed. Check Pilot before repeating it.";
-                            throw;
-                        }
+                        else LastCommandStatus = "Duplicate command rejected; the action was not repeated.";
                     }
-                    else LastCommandStatus = "Duplicate command rejected; the action was not repeated.";
                 }
-                await Task.Delay(TimeSpan.FromSeconds(3), token);
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested) { return; }
-            catch
+            catch (Exception error)
             {
+                LastCommandStatus = $"Connection interrupted ({(error is WebSocketException wsError ? wsError.WebSocketErrorCode.ToString() : error.GetType().Name)}); reconnecting securely.";
                 Status = "Connection unavailable; retrying";
                 ConnectionStopped?.Invoke(); // Cancel pending Epic approval on loss of trust/connectivity.
-                try { await Task.Delay(TimeSpan.FromSeconds(10), token); }
+                try { await Task.Delay(TimeSpan.FromSeconds(Math.Min(300, 5 * Math.Pow(2, Math.Min(++failures, 6))) + Random.Shared.Next(5)), token); }
                 catch (OperationCanceledException) { return; }
             }
+        }
+    }
+
+    internal static async Task<byte[]> ReceiveCommandAsync(WebSocket socket, CancellationToken token)
+    {
+        using var data = new MemoryStream();
+        byte[] chunk = new byte[8192];
+        while (true)
+        {
+            var received = await socket.ReceiveAsync(chunk.AsMemory(), token);
+            if (received.MessageType != WebSocketMessageType.Text || data.Length + received.Count > 200_000)
+                throw new InvalidDataException("Invalid command frame or closed connection.");
+            data.Write(chunk, 0, received.Count);
+            if (received.EndOfMessage) return data.ToArray();
         }
     }
 
@@ -267,7 +296,7 @@ internal sealed class DiscordRemote : IDisposable
     public void Dispose()
     {
         if (shutdown.IsCancellationRequested) return;
-        shutdown.Cancel(); ConnectionStopped?.Invoke(); lifetime?.Cancel(); http.Dispose();
+        shutdown.Cancel(); ConnectionStopped?.Invoke(); lifetime?.Cancel(); socketHttp.Dispose(); http.Dispose();
         instance?.Dispose();
     }
 }

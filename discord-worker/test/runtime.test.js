@@ -47,19 +47,52 @@ for (const discordStatus of [200, 302]) test(`Cloudflare runtime: pairing, isola
     assert.deepEqual(claims.map(r => r.status).sort(), [200, 403]);
     const token = tokens[claims.findIndex(r => r.status === 200)];
     assert.equal((await device('poll', token, {}, '222222222222222222')).status, 401);
-    assert.equal((await device('poll', token)).status, 200);
+    const connectHeaders = { ...await signedHeaders(token, user, 'connect', '', { method: 'GET' }), Upgrade: 'websocket' };
+    const connect = headers => mf.dispatchFetch(`https://pilot.example/device/${user}/connect`, { headers });
+    assert.equal((await connect({ Upgrade: 'websocket' })).status, 401);
+    assert.equal((await connect({ ...await signedHeaders(token, user, 'connect', ''), Upgrade: 'websocket' })).status, 401, 'POST proof cannot authorize GET upgrade');
+    assert.equal((await mf.dispatchFetch('https://pilot.example/device/222222222222222222/connect', { headers: connectHeaders })).status, 401);
+    const upgraded = await connect(connectHeaders);
+    assert.equal(upgraded.status, 101);
+    assert.equal((await connect(connectHeaders)).status, 401, 'Handshake nonce cannot be replayed');
+    let socket = upgraded.webSocket;
+    const inbox = [];
+    let waiter;
+    const disconnected = new WeakMap();
+    function listen(ws) {
+      disconnected.set(ws, { promise: new Promise(resolve => { ws.onDisconnect = resolve; }) });
+      ws.addEventListener('message', event => { const value = JSON.parse(event.data); if (value.disconnected) { ws.onDisconnect(); ws.close(1000); return; } if (waiter) { const resolve = waiter; waiter = null; resolve(value); } else inbox.push(value); });
+      ws.accept();
+    }
+    async function next() {
+      if (inbox.length) return inbox.shift();
+      let timer;
+      try { return await Promise.race([new Promise(resolve => { waiter = resolve; }), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('WebSocket delivery timed out')), 3000); })]); }
+      finally { clearTimeout(timer); waiter = null; }
+    }
+    listen(socket);
+    assert.equal((await next()).ready, true);
     assert.equal((await (await interaction('progress')).json()).type, 5);
-    const polls = await Promise.all([device('poll', token), device('poll', token)]);
-    const commands = await Promise.all(polls.map(r => r.json()));
-    assert.equal(commands.filter(r => r.command !== null).length, 1);
-    const command = commands.find(r => r.command !== null).command;
+    const command = (await next()).command;
+    assert.equal(command.command, 'progress');
+    // Reconnect while an action is outstanding: it must not execute twice.
+    const replacement = await connect({ ...await signedHeaders(token, user, 'connect', '', { method: 'GET' }), Upgrade: 'websocket' });
+    assert.equal(replacement.status, 101);
+    socket = replacement.webSocket;
+    listen(socket);
+    assert.equal((await next()).ready, true);
+    assert.equal((await (await device('poll', token)).json()).command, null, 'Pushed command cannot be redelivered by legacy poll');
     const result = await device('result', token, { id: command.id, content: 'Runtime reply' });
     const resultBody = await result.json();
     assert.equal(result.status, discordStatus === 200 ? 200 : 502, JSON.stringify(resultBody));
     if (discordStatus === 302) assert.equal(resultBody.discordStatus, 302);
     else assert.equal(resultBody.accepted, true);
     assert.equal(outboundCalls, 1, 'Redirect must not forward tokens or results');
-    await interaction('unlink');
+    const closed = disconnected.get(socket).promise;
+    const unlinked = await (await interaction('unlink')).json();
+    assert.match(JSON.stringify(unlinked), /Disconnected/);
+    await Promise.race([closed, new Promise((_, reject) => { const timer = setTimeout(() => reject(new Error('Revocation did not invalidate socket')), 3000); timer.unref(); })]);
+    assert.equal((await connect({ ...await signedHeaders(token, user, 'connect', '', { method: 'GET' }), Upgrade: 'websocket' })).status, 401);
     assert.equal((await device('poll', token)).status, 401);
   } finally { await mf.dispose(); }
 });
