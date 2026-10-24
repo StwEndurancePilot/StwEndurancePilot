@@ -307,6 +307,8 @@ public sealed partial class MainForm : Form
                         return;
                     }
                 }
+                if (runner.IsRunning && runner.Mode != RunnerMode.Observe && controller.Status != ControllerStatus.PausedForAttention)
+                    GameWindow.RestoreForAutomation();
                 var game = GameWindow.Find();
                 if (game is null)
                 {
@@ -329,13 +331,21 @@ public sealed partial class MainForm : Form
                         WaitForUserInput("Waiting for Fortnite focus.");
                     }
 
-                    bool resumeUnattended = autoResumeFortnite && runner.IsRunning && runner.Mode != RunnerMode.Observe
+                    bool resumeUnattended = runner.IsRunning && runner.Mode != RunnerMode.Observe
                         && controller.Status is ControllerStatus.Observing or ControllerStatus.AwaitingTransition;
-                    bool idle = InputReady(game, resumeUnattended);
                     controller.InvalidateObservation();
-                    if (idle && resumeUnattended && game.Activate())
+                    bool focused = false;
+                    if (resumeUnattended)
                     {
-                        interactionPause.Begin();
+                        int focusingSession = session;
+                        busy = true;
+                        try { focused = await GameInput.FocusForAutomationAsync(game, closing.Token); }
+                        finally { busy = false; }
+                        if (closed || focusingSession != session) return;
+                    }
+                    if (focused)
+                    {
+                        interactionPause.Clear();
                         InputPauseChanged?.Invoke();
                         timer.Interval = 250;
                         status.Text = "Focusing Fortnite · waiting for fresh screen evidence";

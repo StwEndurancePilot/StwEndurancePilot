@@ -3,7 +3,7 @@ namespace EndurancePilot.Core;
 public static class NavigationTiming
 {
     public const int MenuPollMilliseconds = 50;
-    public const int GameplayPollMilliseconds = 2500;
+    public const int GameplayPollMilliseconds = 500;
 
     public static readonly TimeSpan HealthProbeMaximumGap = TimeSpan.FromSeconds(30);
     public static TimeSpan MaximumObservationAge(NavigationStep? step) => step is NavigationStep.RetryQuestMenu
@@ -18,7 +18,7 @@ public static class NavigationTiming
         && step is not (NavigationStep.StartEndurance or NavigationStep.ClaimReward
             or NavigationStep.ContinueResults or NavigationStep.CollectMissionRewards or NavigationStep.ReturnToHomebase);
 
-    public static bool IsFastStep(NavigationStep? step) => step is NavigationStep.EnterSaveTheWorld or NavigationStep.OpenMap
+    public static bool IsFastStep(NavigationStep? step) => step is NavigationStep.KeepPlaying or NavigationStep.EnterSaveTheWorld or NavigationStep.OpenMap
         or NavigationStep.ChangeZone or NavigationStep.EnterZone or NavigationStep.SelectHomebase or NavigationStep.OpenHomebase
         or NavigationStep.SelectOwnHomebase or NavigationStep.LaunchHomebase or NavigationStep.LaunchLoadedHomebase
         or NavigationStep.SelectEndurance or NavigationStep.SelectStormShieldExpansion or NavigationStep.DisableAssistance or NavigationStep.EnableAssistance or NavigationStep.SelectSaveTheWorld

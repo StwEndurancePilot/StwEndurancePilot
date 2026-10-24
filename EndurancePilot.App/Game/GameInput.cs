@@ -8,8 +8,8 @@ internal sealed class TargetChangedException() : InvalidOperationException("Dete
 
 internal static class GameInput
 {
-    // Only called for an explicit remote Start, never by the background polling loop.
-    internal static async Task<bool> FocusForRemoteStartAsync(GameWindow game, CancellationToken cancellation)
+    // Used for remote Start and foreground recovery while automation is running.
+    internal static async Task<bool> FocusForAutomationAsync(GameWindow game, CancellationToken cancellation)
     {
         cancellation.ThrowIfCancellationRequested();
         if (GameWindow.Find() != game) return false;

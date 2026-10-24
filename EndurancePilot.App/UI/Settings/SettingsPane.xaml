@@ -120,31 +120,12 @@
           </StackPanel>
         </Border>
         <TextBlock Text="FOCUS" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PilotSecondary}" Margin="0,24,0,12" />
-        <Border CornerRadius="12" Background="{DynamicResource PilotSurface}" BorderBrush="{DynamicResource PilotBorder}" BorderThickness="1">
+        <Border CornerRadius="12" Background="{DynamicResource PilotSurface}" BorderBrush="{DynamicResource PilotBorder}" BorderThickness="1" Padding="18">
           <StackPanel>
-            <Grid Margin="18,18">
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition />
-                <ColumnDefinition Width="Auto" />
-              </Grid.ColumnDefinitions>
-              <StackPanel Margin="0,0,20,0">
-                <TextBlock Text="Focus Fortnite when idle" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" />
-                <TextBlock Text="After you stop using the keyboard and mouse, focus Fortnite and resume the runner." FontSize="12" TextWrapping="Wrap" LineHeight="18" Foreground="{DynamicResource PilotSecondary}" Margin="0,6,0,0" />
-              </StackPanel>
-              <ui:ToggleSwitch x:Name="FocusWhenIdleToggle" Grid.Column="1" VerticalAlignment="Center" AutomationProperties.Name="Focus Fortnite when idle" />
-            </Grid>
-            <Border Height="1" Background="{DynamicResource PilotBorder}" Margin="18,0" />
-            <Grid Margin="18,18">
-              <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-              </Grid.RowDefinitions>
-              <TextBlock Text="Idle delay" FontSize="14" />
-              <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,10,0,0">
-                <ui:NumberBox x:Name="FocusIdleSecondsInput" Width="160" Height="40" Padding="10,6" FontSize="16" VerticalContentAlignment="Center" Value="10" Minimum="2" Maximum="600" MaxDecimalPlaces="0" AcceptsExpression="False" AutomationProperties.Name="Seconds before focusing Fortnite" />
-                <TextBlock Text="sec" FontSize="12" VerticalAlignment="Center" Margin="8,0,0,0" />
-              </StackPanel>
-            </Grid>
+            <TextBlock Text="Keep Fortnite in the foreground" FontSize="14" FontWeight="SemiBold" />
+            <TextBlock Text="While the runner is active, Pilot restores and focuses Fortnite automatically before acting. Stop the runner to use other windows freely." FontSize="12" TextWrapping="Wrap" LineHeight="18" Foreground="{DynamicResource PilotSecondary}" Margin="0,6,0,0" />
+            <ui:ToggleSwitch x:Name="FocusWhenIdleToggle" Visibility="Collapsed" />
+            <ui:NumberBox x:Name="FocusIdleSecondsInput" Visibility="Collapsed" Minimum="2" Maximum="600" />
           </StackPanel>
         </Border>
         <TextBlock Text="SHORTCUT" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PilotSecondary}" Margin="0,24,0,12" />

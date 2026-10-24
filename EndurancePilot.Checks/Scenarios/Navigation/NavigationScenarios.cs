@@ -434,8 +434,8 @@ internal static class NavigationScenarios
         check("Mission entry animation keeps fast polling", NavigationTiming.PollMilliseconds(ScreenKind.Unknown, NavigationStep.EnterZone) == 50);
         check("Map and lobby use fast polling", NavigationTiming.PollMilliseconds(ScreenKind.WorldMap, null) == 50
             && NavigationTiming.PollMilliseconds(ScreenKind.SaveTheWorldLobby, null) == 50);
-        check("Gameplay retains slower polling", NavigationTiming.PollMilliseconds(ScreenKind.ActiveEndurance, null) == 2500);
-        check("Unknown idle screen retains slower polling", NavigationTiming.PollMilliseconds(ScreenKind.Unknown, null) == 2500);
+        check("Gameplay polls promptly for interruptions", NavigationTiming.PollMilliseconds(ScreenKind.ActiveEndurance, null) == 500);
+        check("Unknown screen polls promptly for sleep overlays", NavigationTiming.PollMilliseconds(ScreenKind.Unknown, null) == 500);
         check("Error recovery cooldown stays unchanged", NavigationTiming.TransitionCooldown(null) == TimeSpan.FromSeconds(5));
         var ready = Frame(0, Label("TWINE PEAKS STORM SNIELD", 100, 200), Label("NERO LOADOUT", 100, 350),
             Label("MAP", 500, 100), Label("COMMAND", 700, 100), Label("ARMORY", 900, 100), Label("LAUNCH", 2000, 1200));

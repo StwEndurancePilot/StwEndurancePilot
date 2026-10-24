@@ -12,6 +12,8 @@ internal static class SleepScenarios
             Label("Fortnite will enter sleep mode soon.", 472, 305, 337, 18),
             Label("PRESS ANY KEY TO KEEP PLAYING", 490, 354, 301, 17)]);
         var countdownEvidence = recognizer.Recognize(countdown);
+        check("Gameplay checks for sleep at least twice a second", NavigationTiming.GameplayPollMilliseconds <= 500);
+        check("Sleep dismissal uses fast confirmation", NavigationTiming.Stability(NavigationStep.KeepPlaying, countdownEvidence) <= TimeSpan.FromMilliseconds(100));
         check("Sleep countdown selects the keep-playing button without a close button", countdownEvidence.Kind == ScreenKind.SleepMode
             && NavigationPlanner.Decide(countdown, countdownEvidence, new()).Plan is { Step: NavigationStep.KeepPlaying, Target.Y: 354 });
         var countdownController = new AutomationController();
