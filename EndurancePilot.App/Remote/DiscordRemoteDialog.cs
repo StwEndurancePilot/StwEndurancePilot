@@ -3,7 +3,7 @@ using System.Windows.Threading;
 
 namespace EndurancePilot.App;
 
-internal partial class DiscordRemoteDialog : Window
+internal partial class DiscordRemoteDialog : Wpf.Ui.Controls.FluentWindow
 {
     private readonly DiscordRemote remote;
     private readonly DiscordPublicSettings? defaults;

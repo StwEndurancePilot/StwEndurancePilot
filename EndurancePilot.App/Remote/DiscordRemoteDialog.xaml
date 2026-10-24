@@ -1,15 +1,18 @@
-<Window x:Class="EndurancePilot.App.DiscordRemoteDialog" x:ClassModifier="internal"
+<ui:FluentWindow x:Class="EndurancePilot.App.DiscordRemoteDialog" x:ClassModifier="internal"
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
  Title="Connect Discord" Width="420" SizeToContent="Height" ResizeMode="NoResize"
  WindowStartupLocation="CenterOwner" Background="{DynamicResource PilotBackground}"
  Foreground="{DynamicResource PilotText}" FontFamily="Segoe UI Variable, Segoe UI" FontSize="13"
- UseLayoutRounding="True">
+ ExtendsContentIntoTitleBar="True" WindowBackdropType="None" UseLayoutRounding="True">
  <Window.Resources>
   <Style TargetType="TextBlock"><Setter Property="TextWrapping" Value="Wrap" /></Style>
   <Style x:Key="Caption" TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource PilotSecondary}" /><Setter Property="TextWrapping" Value="Wrap" /><Setter Property="FontSize" Value="12" /><Setter Property="LineHeight" Value="18" /></Style>
  </Window.Resources>
+ <DockPanel LastChildFill="True">
+ <ui:TitleBar DockPanel.Dock="Top" Title="Connect Discord" ShowMinimize="False" ShowMaximize="False"
+  Background="{DynamicResource PilotBackground}" Foreground="{DynamicResource PilotText}" FontSize="11" />
  <Border Background="{DynamicResource PilotBackground}">
  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
   <StackPanel Margin="28">
@@ -32,4 +35,5 @@
   </StackPanel>
  </ScrollViewer>
  </Border>
-</Window>
+ </DockPanel>
+</ui:FluentWindow>
