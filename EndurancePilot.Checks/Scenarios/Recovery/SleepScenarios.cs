@@ -8,6 +8,22 @@ internal static class SleepScenarios
         var sleep = new Observation(epoch, 1650, 928, [Label("FORTNITE IS IN SLEEP MODE",490,345,675,30),
             Label("KEEP PLAYING",740,420,170),Label("CLOSE FORTNITE",729,488,190)]);
         var recognizer = new ScreenRecognizer();
+        var countdown = new Observation(epoch, 1280, 696, [Label("ARE YOU STILL THERE?", 434, 261, 412, 25),
+            Label("Fortnite will enter sleep mode soon.", 472, 305, 337, 18),
+            Label("PRESS ANY KEY TO KEEP PLAYING", 490, 354, 301, 17)]);
+        var countdownEvidence = recognizer.Recognize(countdown);
+        check("Sleep countdown selects the keep-playing button without a close button", countdownEvidence.Kind == ScreenKind.SleepMode
+            && NavigationPlanner.Decide(countdown, countdownEvidence, new()).Plan is { Step: NavigationStep.KeepPlaying, Target.Y: 354 });
+        var countdownController = new AutomationController();
+        countdownController.Start(runInProgress: true);
+        check("Countdown requires stable evidence before input", countdownController.Observe(countdown, countdownEvidence) is null);
+        check("Countdown wakes during an active run", countdownController.Observe(countdown with { CapturedAt = epoch.AddSeconds(.6) }, countdownEvidence)?.Step == NavigationStep.KeepPlaying);
+        var noButton = countdown with { Regions = countdown.Regions.Take(2).ToArray() };
+        check("Countdown without a button sends no input", NavigationPlanner.Decide(noButton, recognizer.Recognize(noButton), new()).Plan is null);
+        var noDetail = countdown with { Regions = [countdown.Regions[0], countdown.Regions[2]] };
+        check("Generic inactivity prompt does not authorize waking", recognizer.Recognize(noDetail).Kind != ScreenKind.SleepMode);
+        var duplicateButton = countdown with { Regions = [.. countdown.Regions, Label("PRESS ANY KEY TO KEEP PLAYING", 490, 385, 301, 17)] };
+        check("Ambiguous countdown targets send no input", NavigationPlanner.Decide(duplicateButton, recognizer.Recognize(duplicateButton), new()).Plan is null);
         var evidence = recognizer.Recognize(sleep);
         check("Sleep overlay selects only Keep Playing", evidence.Kind == ScreenKind.SleepMode
             && NavigationPlanner.Decide(sleep, evidence, new()).Plan is { Step: NavigationStep.KeepPlaying, Target.Y: 420 });
