@@ -22,14 +22,14 @@ internal static class RemoteSecurityChecks
         Ed25519.GeneratePublicKey(seed, 0, publicKey, 0);
         var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         var config = new RemoteConfiguration("https://pilot.example", User, "", false, false, App, Convert.ToHexStringLower(publicKey), now - 1000, now + 60_000);
-        RemoteCommand Command(string user = User, string application = App, string action = "progress", int? account = null, long? issued = null)
+        RemoteCommand Command(string user = User, string application = App, string action = "progress", int? account = null, long? issued = null, bool topLevel = false)
         {
             string timestamp = ((issued ?? now) / 1000).ToString();
             string id = "444444444444444444";
             object option = action == "switch" && account is not null
                 ? new { name = action, type = 1, options = new[] { new { name = "account", type = 4, value = account } } }
                 : new { name = action, type = 1 };
-            string body = JsonSerializer.Serialize(new { id, type = 2, application_id = application, token = "test-only-reply-token", user = new { id = user }, data = new { name = "pilot", options = new[] { option } } });
+            string body = JsonSerializer.Serialize(new { id, type = 2, application_id = application, token = "test-only-reply-token", user = new { id = user }, data = topLevel ? (object)new { name = action } : new { name = "pilot", options = new[] { option } } });
             var data = Encoding.UTF8.GetBytes(timestamp + body);
             var signature = new byte[64];
             Ed25519.Sign(seed, 0, data, 0, data.Length, signature, 0);
@@ -53,6 +53,13 @@ internal static class RemoteSecurityChecks
         Check("Account dropdown rejects another application", !RemoteCommandProof.Verify(Selection(app: "555555555555555555"), config, now));
         Check("Account menu can be requested without an account number", RemoteCommandProof.Verify(Command(action: "switch"), config, now));
         var command = Command();
+        foreach (string action in new[] { "progress", "accounts", "start", "kill", "restart" })
+        {
+            var top = Command(action: action, topLevel: true);
+            Check("Top-level signed " + action + " verifies", RemoteCommandProof.Verify(top, config with { AllowControl = true }, now));
+            Check("Top-level command cannot become another action", !RemoteCommandProof.Verify(top with { Command = "launch" }, config with { AllowControl = true }, now));
+            Check("Top-level command remains owner bound", !RemoteCommandProof.Verify(Command(user: "222222222222222222", action: action, topLevel: true), config with { AllowControl = true }, now));
+        }
         Check("Desktop verifies an authentic Discord command", RemoteCommandProof.Verify(command, config, now));
         Check("Desktop rejects unsigned Worker commands", !RemoteCommandProof.Verify(command with { Proof = null }, config, now));
         Check("Desktop rejects another Discord user", !RemoteCommandProof.Verify(Command(user: "222222222222222222"), config, now));

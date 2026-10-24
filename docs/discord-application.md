@@ -36,18 +36,20 @@ The workflow is separate from Windows releases. It pins GitHub actions to commit
 
 | Command | Behavior |
 | --- | --- |
-| `/pilot progress` | Running/stopped state, attention flag, wave and completed session runs |
-| `/pilot statistics` | Session/lifetime completed runs and lifetime reward totals |
-| `/pilot accounts` | Account embed with the current selection and dropdowns to switch saved accounts; runner must be stopped to change the next-launch account |
-| `/pilot login` | Get an Epic website approval link; account credentials are acquired and encrypted on the PC |
-| `/pilot screenshot` | Capture the Fortnite window using Windows Graphics Capture; requires screenshot permission |
-| `/pilot menu` | Show the already-running Pilot window on the PC |
-| `/pilot start` | Start endurance with the saved settings |
-| `/pilot stop` | Stop automation, leaving Fortnite open |
-| `/pilot launch` | Launch Fortnite with the selected account, if it is not already running |
+| `/progress` | Running/stopped state, attention flag, wave and completed session runs |
+| `/statistics` | Session/lifetime completed runs and lifetime reward totals |
+| `/accounts` | Account embed with the current selection and dropdowns to switch saved accounts; runner must be stopped to change the next-launch account |
+| `/login` | Get an Epic website approval link; account credentials are acquired and encrypted on the PC |
+| `/screenshot` | Capture the Fortnite window using Windows Graphics Capture; requires screenshot permission |
+| `/menu` | Show the already-running Pilot window on the PC |
+| `/start` | Start endurance with the saved settings |
+| `/stop` | Stop automation, leaving Fortnite open |
+| `/launch` | Launch Fortnite with the selected account, if it is not already running |
+| `/kill` | Stop the runner and terminate Fortnite in the current Windows session |
+| `/restart` | Stop the runner, close Fortnite, then launch the selected account; use `/start` to resume automation |
 | `/unpair` | Revoke cloud device access and discard queued work |
 
-The desktop **Disconnect and revoke** button disables the connection and deletes its Windows signing key and saved configuration, even when the cloud revoke request fails. If the network is down, also use `/unpair` to clear the cloud pairing. Commands already executing cannot be undone by revocation. Cloud revocation is observed on the next poll; pending sign-in is then cancelled. Loss of connectivity also cancels pending remote sign-in. `/pilot login` cannot add an account after local disconnection or after the client has detected cloud revocation.
+The desktop **Disconnect and revoke** button disables the connection and deletes its Windows signing key and saved configuration, even when the cloud revoke request fails. If the network is down, also use `/unpair` to clear the cloud pairing. Commands already executing cannot be undone by revocation. Cloud revocation is observed on the next poll; pending sign-in is then cancelled. Loss of connectivity also cancels pending remote sign-in. `/login` cannot add an account after local disconnection or after the client has detected cloud revocation.
 
 If Discord keeps showing “thinking” after an action executes, check reply delivery before repeating the action. The Worker identifies itself with Discord's required `DiscordBot` User-Agent. After a failed result delivery, it keeps only the pending reply metadata until the original 45-second deadline and attempts a generic completion notice; it does not persist result text or screenshots, or execute the action again. Persistent Discord/network failures can also prevent that fallback from arriving. The device result endpoint returns HTTP 502 with a numeric `discordStatus` (or null for a transport failure), never the upstream error body or reply token.
 
@@ -55,7 +57,7 @@ The desktop remote-control dialog refreshes connection status and keeps the last
 
 The security-audit changes introduce device protocol v2. **Old bearer-token pairings are intentionally unsupported.** Update the Worker and desktop together, run `/unpair`, and pair again with the application ID and public key. If unlink and pair are sent within the same second, wait a second and resend pair: requests predating revocation are rejected. A failed or interrupted pairing can leave an unusable cloud reservation; unlink it before retrying.
 
-Epic passwords, authorization codes, device IDs and device secrets are never entered into Discord. The approval URL is sensitive until it expires: approve only your own pairing and never forward that link. `/pilot accounts` reports sign-in completion. Remote account switching does not forcibly close Fortnite or terminate a live mission.
+Epic passwords, authorization codes, device IDs and device secrets are never entered into Discord. The approval URL is sensitive until it expires: approve only your own pairing and never forward that link. `/accounts` reports sign-in completion. Remote account switching does not forcibly close Fortnite or terminate a live mission.
 
 ## Security and privacy boundaries
 

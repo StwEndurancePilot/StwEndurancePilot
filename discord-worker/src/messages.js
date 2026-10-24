@@ -1,5 +1,5 @@
 // Discord-native presentation: restrained colour, clear titles and compact metrics.
-const titles = { progress: 'Run progress', statistics: 'Session & lifetime', accounts: 'Your accounts', switch: 'Choose an account', login: 'Connect an Epic account', screenshot: 'Fortnite · live capture', menu: 'Pilot window', start: 'Runner control', stop: 'Runner control', launch: 'Fortnite launch', notice: 'Endurance Pilot' };
+const titles = { progress: 'Run progress', statistics: 'Session & lifetime', accounts: 'Your accounts', switch: 'Choose an account', login: 'Connect an Epic account', screenshot: 'Fortnite · live capture', menu: 'Pilot window', start: 'Runner control', stop: 'Runner control', launch: 'Fortnite launch', kill: 'Fortnite closed', restart: 'Fortnite restart', notice: 'Endurance Pilot' };
 export function message(command, content, image = false, accounts = null) {
   const embed = { title: titles[command] ?? titles.notice, description: content, color: 0xB8C8BE };
   const confirmed = { start: ['Runner started', 'Run started'], stop: ['Runner stopped', 'Run stopped'], launch: ['Fortnite launch requested', 'Launching Fortnite'], menu: ['Pilot is visible', 'Pilot is open'], switch: ['Selected account changed', 'Account selected'] }[command];
@@ -29,13 +29,13 @@ export function message(command, content, image = false, accounts = null) {
 }
 function failureDetails(command, content, image) {
   if (command === 'screenshot' && !image) {
-    if (/No visible Fortnite window/i.test(content)) return { title: 'Screenshot unavailable · Fortnite not found', next: 'Open Fortnite on your paired PC, then run `/pilot screenshot` again.' };
+    if (/No visible Fortnite window/i.test(content)) return { title: 'Screenshot unavailable · Fortnite not found', next: 'Open Fortnite on your paired PC, then run `/screenshot` again.' };
     if (/disabled|not permitted/i.test(content)) return { title: 'Screenshot blocked · Permission required', next: 'Enable screenshot access by pairing again in Pilot, then retry.' };
-    return { title: 'Screenshot could not be captured', next: 'Check that Fortnite is open and its game window is available on your PC, then retry `/pilot screenshot`.' };
+    return { title: 'Screenshot could not be captured', next: 'Check that Fortnite is open and its game window is available on your PC, then retry `/screenshot`.' };
   }
-  if (/^No saved accounts/i.test(content)) return { title: 'No accounts connected', next: 'Use `/pilot login` to connect an Epic account, then open `/pilot accounts`.' };
+  if (/^No saved accounts/i.test(content)) return { title: 'No accounts connected', next: 'Use `/login` to connect an Epic account, then open `/accounts`.' };
   if (/^Your PC is offline/i.test(content)) return { title: 'PC unavailable', next: 'Open Pilot on your paired PC and check its connection, then retry your command.' };
-  if (/^Your saved accounts have changed/i.test(content)) return { title: 'Account list has changed', next: 'Open `/pilot accounts` again and choose from the updated dropdown.' };
+  if (/^Your saved accounts have changed/i.test(content)) return { title: 'Account list has changed', next: 'Open `/accounts` again and choose from the updated dropdown.' };
   if (/^(Stop the runner|Finish account sign-in)/i.test(content)) return { title: 'Action blocked · PC is busy', next: 'Finish the activity described above on your PC, then try again.' };
   if (/could not|couldn’t|failed|not permitted|disabled|unavailable|offline|did not respond|not be delivered/i.test(content)) return { title: 'Action could not be completed', next: 'Check Pilot on your PC before repeating the command.' };
   return null;

@@ -53,6 +53,37 @@ internal static class EpicLauncher
         finally { LaunchGate.Release(); }
     }
 
+    internal static async Task StopGameAsync(CancellationToken token)
+    {
+        await LaunchGate.WaitAsync(token);
+        try
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+            timeout.CancelAfter(TimeSpan.FromSeconds(15));
+            int session = Process.GetCurrentProcess().SessionId;
+            // Exact Fortnite processes in this Windows session only. Never terminate
+            // Epic Games Launcher, anti-cheat services, or unrelated child processes.
+            foreach (string name in new[] { "FortniteLauncher", "FortniteBootstrapper", "FortniteClient-Win64-Shipping", "FortniteClient-Win64-Shipping_EAC_EOS", "FortniteClient-Win64-Shipping_BE" })
+            {
+                foreach (var process in Process.GetProcessesByName(name))
+                {
+                    using (process)
+                    {
+                        token.ThrowIfCancellationRequested();
+                        try
+                        {
+                            if (process.HasExited || process.SessionId != session) continue;
+                            process.Kill();
+                            await process.WaitForExitAsync(timeout.Token);
+                        }
+                        catch (InvalidOperationException) when (process.HasExited) { }
+                    }
+                }
+            }
+        }
+        finally { LaunchGate.Release(); }
+    }
+
     public static string? CustomInstallPath => File.Exists(PathFile) ? File.ReadAllText(PathFile).Trim() : null;
 
     public static void SetInstallPath(string path)

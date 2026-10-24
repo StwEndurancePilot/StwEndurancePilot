@@ -6,16 +6,14 @@ const descriptions = {
   accounts: 'View and switch your saved accounts',
   login: 'Approve a new Epic account on Epic’s website', screenshot: 'Capture only the Fortnite window',
   menu: 'Show the Pilot window on your PC', start: 'Start endurance using saved settings',
-  stop: 'Stop the runner', launch: 'Launch Fortnite with the selected account'
+  stop: 'Stop the runner', launch: 'Launch Fortnite with the selected account',
+  kill: 'Stop the runner and close Fortnite', restart: 'Stop the runner and restart Fortnite with the selected account'
 };
-const command = { name: 'pilot', description: 'Control your paired Endurance Pilot PC', type: 1,
-  integration_types: [0, 1], contexts: [0, 1, 2], options: Object.entries(descriptions).map(([name, description]) => ({
-    type: 1, name, description
-  })) };
+const commands = Object.entries(descriptions).map(([name, description]) => ({ name, description, type: 1, integration_types: [0, 1], contexts: [0, 1, 2] }));
 const response = await fetch(`https://discord.com/api/v10/applications/${id}/commands`, {
   method: 'PUT', headers: { Authorization: `Bot ${token}`, 'Content-Type': 'application/json',
-    'User-Agent': 'DiscordBot (https://github.com/StwEndurancePilot/StwEndurancePilot, 1.0)' }, body: JSON.stringify([command, ...[{ name: 'pair', description: 'Connect your PC to Discord' }, { name: 'unpair', description: 'Disconnect your paired PC' }].map(c => ({ ...c, type: 1, integration_types: [0, 1], contexts: [0, 1, 2] }))]),
+    'User-Agent': 'DiscordBot (https://github.com/StwEndurancePilot/StwEndurancePilot, 1.0)' }, body: JSON.stringify([...commands, ...[{ name: 'pair', description: 'Connect your PC to Discord' }, { name: 'unpair', description: 'Disconnect your paired PC' }].map(c => ({ ...c, type: 1, integration_types: [0, 1], contexts: [0, 1, 2] }))]),
   redirect: 'error', signal: AbortSignal.timeout(15_000)
 });
 if (!response.ok) throw new Error(`Command registration failed (${response.status}).`);
-console.log('Registered /pilot, /pair and /unpair.');
+console.log('Registered top-level Pilot commands, /pair and /unpair.');

@@ -43,5 +43,5 @@ test('accounts embed presents selected account and count with no separate switch
   const result = message('accounts', 'Choose an account below.', false, [{ number: 1, name: 'Saved account', selected: true }]);
   assert.equal(result.embeds[0].fields[0].value, 'Saved account');
   assert.equal(result.embeds[0].fields[1].value, '1');
-  assert.equal(JSON.stringify(result).includes('/pilot switch'), false);
+  assert.equal(JSON.stringify(result).includes('/switch'), false);
 });

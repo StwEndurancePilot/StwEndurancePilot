@@ -7,7 +7,7 @@ internal static class RemotePermissions
     {
         "progress" or "statistics" or "accounts" => true,
         "screenshot" => configuration.AllowScreenshots,
-        "switch" or "login" or "menu" or "start" or "stop" or "launch" => configuration.AllowControl,
+        "switch" or "login" or "menu" or "start" or "stop" or "launch" or "kill" or "restart" => configuration.AllowControl,
         _ => false
     };
 }

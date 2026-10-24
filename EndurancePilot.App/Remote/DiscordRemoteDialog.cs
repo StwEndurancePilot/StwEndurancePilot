@@ -33,7 +33,7 @@ internal partial class DiscordRemoteDialog : Wpf.Ui.Controls.FluentWindow
         Heading.Text = paired ? "Discord connected" : "Connect Discord";
         Intro.Text = paired ? "Keep Pilot open to use your commands." : "Run /pair in Discord, then paste your pairing code.";
         ConnectionTitle.Text = remote.Status == "Connected" ? "Connected to Discord" : "Connection status";
-        ConnectionDetail.Text = remote.Status == "Connected" ? "Ready for /pilot accounts, /pilot progress and more." : remote.Status;
+        ConnectionDetail.Text = remote.Status == "Connected" ? "Ready for /accounts, /progress and more." : remote.Status;
         PairingCode.IsEnabled = !paired && !busy;
         PairButton.IsEnabled = !busy && defaults is not null;
         DisconnectButton.IsEnabled = !busy;

@@ -26,7 +26,7 @@ for (const discordStatus of [200, 302]) test(`Cloudflare runtime: pairing, isola
   let sequence = 0;
   async function interaction(command, application = app) {
     const timestamp = String(Math.floor(Date.now() / 1000));
-    const body = JSON.stringify({ id: String(100000000000000000n + BigInt(++sequence)), type: 2, application_id: application, token: 'secret', user: { id: user }, data: command === 'pair' ? { name: 'pair' } : command === 'unlink' ? { name: 'unpair' } : { name: 'pilot', options: [{ name: command, type: 1 }] } });
+    const body = JSON.stringify({ id: String(100000000000000000n + BigInt(++sequence)), type: 2, application_id: application, token: 'secret', user: { id: user }, data: command === 'pair' ? { name: 'pair' } : command === 'unlink' ? { name: 'unpair' } : { name: command } });
     const signature = Buffer.from(await crypto.subtle.sign('Ed25519', keys.privateKey, new TextEncoder().encode(timestamp + body))).toString('hex');
     return mf.dispatchFetch('https://pilot.example/interactions', { method: 'POST', body,
       headers: { 'X-Signature-Timestamp': timestamp, 'X-Signature-Ed25519': signature } });

@@ -16,7 +16,7 @@ internal static class RemoteChecks
             "333333333333333333", new string('0', 64), 0, long.MaxValue);
         foreach (var command in new[] { "progress", "statistics", "accounts" })
             Check($"Discord permits paired read command {command}", RemotePermissions.Allows(command, configuration));
-        foreach (var command in new[] { "switch", "login", "menu", "start", "stop", "launch" })
+        foreach (var command in new[] { "switch", "login", "menu", "start", "stop", "launch", "kill", "restart" })
         {
             Check($"Discord denies {command} without local control permission", !RemotePermissions.Allows(command, configuration));
             Check($"Discord permits {command} with local control permission", RemotePermissions.Allows(command, configuration with { AllowControl = true }));

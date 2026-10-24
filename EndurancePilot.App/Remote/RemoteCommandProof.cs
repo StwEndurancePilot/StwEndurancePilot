@@ -49,7 +49,12 @@ internal static class RemoteCommandProof
                 return number > page * 25 && number <= (page + 1) * 25 && command.Account == number && command.AccountSet == match.Groups[1].Value;
             }
             if (i.GetProperty("type").GetInt32() != 2 || command.AccountSet is not null) return false;
-            if (data.GetProperty("name").GetString() != "pilot") return false;
+            if (data.GetProperty("name").GetString() != "pilot")
+            {
+                return data.GetProperty("name").GetString() == command.Command && command.Account is null
+                    && RemotePermissions.Allows(command.Command, configuration)
+                    && (!data.TryGetProperty("options", out var topOptions) || topOptions.GetArrayLength() == 0);
+            }
             var options = data.GetProperty("options");
             if (options.GetArrayLength() != 1) return false;
             var option = options[0];

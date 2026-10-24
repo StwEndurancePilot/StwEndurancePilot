@@ -44,7 +44,7 @@ public partial class PilotWindow
                 if (host.Snapshot().Running) return new("Runner is already running.");
                 AccountPopup.IsOpen = false;
                 if (GameWindow.Find() is { } startGame && !await GameInput.FocusForAutomationAsync(startGame, token))
-                    return new("Runner could not start because Windows did not let Pilot focus Fortnite. Unlock your PC, release any held keys and try /pilot start again.");
+                    return new("Runner could not start because Windows did not let Pilot focus Fortnite. Unlock your PC, release any held keys and try /start again.");
                 token.ThrowIfCancellationRequested();
                 if (remoteLogin is not null) return new("Finish account sign-in before starting.");
                 if (!host.Snapshot().Running) ToggleFromControls();
@@ -58,10 +58,10 @@ public partial class PilotWindow
                     System.Text.Json.JsonSerializer.Serialize(choices.Select(a => a.AccountId)))));
                 if (command.Account is null) return AccountMenu(true);
                 if (command.AccountSet is not null && command.AccountSet != accountSet)
-                    return new("Your saved accounts have changed. Run /pilot accounts again for a fresh list.");
+                    return new("Your saved accounts have changed. Run /accounts again for a fresh list.");
                 if (host.Snapshot().Running)
-                    return new("Stop the runner with /pilot stop before changing the account for the next launch.");
-                if (command.Account is not { } number || number < 1 || number > EpicLauncher.Accounts.All.Count) return new("Account number is unavailable. Run /pilot accounts again.");
+                    return new("Stop the runner with /stop before changing the account for the next launch.");
+                if (command.Account is not { } number || number < 1 || number > EpicLauncher.Accounts.All.Count) return new("Account number is unavailable. Run /accounts again.");
                 // Selecting a saved account supersedes an unfinished remote sign-in.
                 // Its completion must not later overwrite this explicit selection.
                 if (remoteLogin is { } pendingLogin)
@@ -77,6 +77,22 @@ public partial class PilotWindow
                 if (host.Snapshot().Running || remoteLogin is not null) return new("Stop the runner and finish sign-in before launching.");
                 await EpicLauncher.LaunchAsync(token);
                 return new("Fortnite launch requested.");
+            case "kill":
+            case "restart":
+                if (remoteLogin is not null) return new("Finish account sign-in before closing or restarting Fortnite.");
+                if (host.Snapshot().Running) host.ToggleRunner();
+                try
+                {
+                    await EpicLauncher.StopGameAsync(token);
+                    if (command.Command == "restart")
+                    {
+                        await EpicLauncher.LaunchAsync(token);
+                        return new("Fortnite restart requested with your selected account. The runner is stopped; use /start when ready.");
+                    }
+                    return new("Fortnite closed. The runner is stopped.");
+                }
+                catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+                catch { return new("Fortnite could not be closed or restarted. Check Pilot and any remaining Fortnite processes on your PC."); }
             case "login":
                 if (host.Snapshot().Running || accountsPane is not null) return new("Stop the runner and close the local accounts pane before remote sign-in.");
                 if (remoteLogin is not null) return new("An Epic sign-in is already pending. Approve it or wait for it to expire.");
@@ -88,7 +104,7 @@ public partial class PilotWindow
                     remoteLogin = new CancellationTokenSource(TimeSpan.FromMinutes(15));
                     remoteLoginStatus = "Epic sign-in pending.";
                     _ = FinishRemoteLoginAsync(signIn, config, remoteLogin);
-                    return new($"Approve this PC on Epic’s website: {signIn.VerificationUri.AbsoluteUri}\nUse /pilot accounts to check completion. Never enter your Epic password in Discord.");
+                    return new($"Approve this PC on Epic’s website: {signIn.VerificationUri.AbsoluteUri}\nUse /accounts to check completion. Never enter your Epic password in Discord.");
                 }
             default: return new("Unsupported command.");
         }
@@ -97,7 +113,7 @@ public partial class PilotWindow
     private RemoteResult AccountMenu(bool allowControl)
     {
         var accounts = EpicLauncher.Accounts.All.Take(100).ToArray();
-        if (accounts.Length == 0) return new("No saved accounts yet. Use /pilot login to connect one.");
+        if (accounts.Length == 0) return new("No saved accounts yet. Use /login to connect one.");
         var choices = accounts.Select((a, i) => new RemoteAccountChoice(i + 1,
             string.IsNullOrWhiteSpace(SafeAccountName(a.DisplayName)) ? $"Account {i + 1}" : SafeAccountName(a.DisplayName),
             EpicLauncher.Accounts.SelectedAccountId == a.AccountId)).ToArray();

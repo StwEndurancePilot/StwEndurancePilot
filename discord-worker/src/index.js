@@ -6,7 +6,7 @@ const hex = (value) => Uint8Array.from(value.match(/../g) ?? [], x => parseInt(x
 const random = (size) => Array.from(crypto.getRandomValues(new Uint8Array(size)), x => x.toString(16).padStart(2, '0')).join('');
 const json = (value, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
 const reply = content => json({ type: 4, data: { ...message('notice', content), flags: 64 } });
-const commands = new Set(['progress', 'statistics', 'accounts', 'switch', 'login', 'screenshot', 'menu', 'start', 'stop', 'launch']);
+const commands = new Set(['progress', 'statistics', 'accounts', 'switch', 'login', 'screenshot', 'menu', 'start', 'stop', 'launch', 'kill', 'restart']);
 
 export async function readLimited(request, limit, timeoutMs = 5000) {
   const reader = request.body?.getReader();
@@ -53,7 +53,7 @@ export default {
         if (interaction.application_id !== env.DISCORD_APPLICATION_ID) return json({ error: 'Unauthorized' }, 401);
         if (interaction.type === 1) return json({ type: 1 });
         const user = interaction.member?.user?.id ?? interaction.user?.id;
-        if (!isUser(user) || !isUser(interaction.id) || !((interaction.type === 2 && ['pilot', 'pair', 'unpair'].includes(interaction.data?.name)) || (interaction.type === 3 && selection(interaction.data)))) return reply('Unsupported command.');
+        if (!isUser(user) || !isUser(interaction.id) || !((interaction.type === 2 && (['pilot', 'pair', 'unpair'].includes(interaction.data?.name) || commands.has(interaction.data?.name))) || (interaction.type === 3 && selection(interaction.data)))) return reply('Unsupported command.');
         return await env.DEVICES.get(env.DEVICES.idFromName(user)).fetch(new Request('https://device/interaction', {
           method: 'POST', body: JSON.stringify({ interaction, proof: { body, signature: request.headers.get('X-Signature-Ed25519'), timestamp: request.headers.get('X-Signature-Timestamp') } })
         }));
@@ -89,7 +89,7 @@ export class Device {
       const { interaction: i, proof } = await request.json();
       const option = i.data.options?.[0];
       const picked = i.type === 3 ? selection(i.data) : null;
-      const command = picked ? 'switch' : i.data.name === 'pair' ? 'pair' : i.data.name === 'unpair' ? 'unlink' : option?.name;
+      const command = picked ? 'switch' : i.data.name === 'pair' ? 'pair' : i.data.name === 'unpair' ? 'unlink' : i.data.name === 'pilot' ? option?.name : i.data.name;
       if (Number(proof.timestamp) * 1000 <= (state.revokedBefore ?? 0)) return reply('Request predates revocation. Send a new command.');
       if (state.seen.some(x => x.id === i.id)) return reply('This request has already been handled.');
       // A signed unlink must remain available even after the command quota is exhausted.
@@ -124,7 +124,7 @@ export class Device {
       if (now - (state.lastCommand ?? 0) < 3000) return reply('Please wait a few seconds between commands.');
       const account = picked?.account ?? option?.options?.find(x => x.name === 'account')?.value;
       const accountSet = picked?.accountSet;
-      if (command === 'switch' && account !== undefined && (!Number.isInteger(account) || account < 1 || account > 100)) return reply('Choose an account number from /pilot accounts.');
+      if (command === 'switch' && account !== undefined && (!Number.isInteger(account) || account < 1 || account > 100)) return reply('Choose an account number from /accounts.');
       state.lastCommand = now;
       state.pending = { id: i.id, command, account, accountSet, expires: now + 45_000,
         application: i.application_id, replyToken: i.token, delivered: false, proof };

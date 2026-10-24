@@ -26,7 +26,7 @@ function fixture() {
   async function interaction(user, name, options, id = String(++sequence)) {
     const response = await env.DEVICES.get(user).fetch(new Request('https://device/interaction', {
       method: 'POST', body: JSON.stringify({ interaction: { id, type: 2, application_id: app, token: 'interaction-secret', user: { id: user },
-        data: { name: 'pilot', options: [{ name, options }] } }, proof: { timestamp: String(Math.floor(Date.now() / 1000) + 1), body: '{}', signature: 'test' } })
+        data: ['kill', 'restart'].includes(name) ? { name } : { name: 'pilot', options: [{ name, options }] } }, proof: { timestamp: String(Math.floor(Date.now() / 1000) + 1), body: '{}', signature: 'test' } })
     }));
     return response.json();
   }
@@ -65,6 +65,16 @@ test('public routing rejects forged interactions and internal dispatch paths', a
   const { env } = fixture();
   assert.equal((await worker.fetch(new Request('https://pilot.example/interactions', { method: 'POST', body: '{}' }), env)).status, 401);
   assert.equal((await worker.fetch(new Request(`https://pilot.example/device/${userA}/interaction`, { method: 'POST', body: '{}' }), env)).status, 404);
+});
+
+for (const command of ['kill', 'restart']) test(`top-level ${command} queues only for the paired owner`, async () => {
+  const f = fixture();
+  const { token } = await f.pair(userA);
+  await f.device(userA, 'poll', token);
+  assert.equal((await f.interaction(userA, command)).type, 5);
+  const result = await (await f.device(userA, 'poll', token)).json();
+  assert.equal(result.command.command, command);
+  assert.equal((await f.device(userB, 'poll', token)).status, 401);
 });
 
 test('pairing stores only a public device key, is single-use, and cannot overwrite a paired PC', async () => {
