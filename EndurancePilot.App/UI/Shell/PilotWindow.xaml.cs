@@ -40,7 +40,7 @@ public partial class PilotWindow : FluentWindow
             if (loaded) RefreshState();
         }));
         host.InitializeBridge();
-        PennyAccountImport.ImportOnce(EpicLauncher.Accounts);
+        PennyAccountImport.ImportOnStartup(EpicLauncher.Accounts, host.ReadSettings().AutoImportPenny);
         InitializeRemote();
         InitializeTray();
         ApplyThemePreference();
@@ -554,6 +554,11 @@ public partial class PilotWindow : FluentWindow
             catch { return "Could not save background settings. No changes were applied."; }
         });
         settingsPane.CheckUpdatesRequested += async (_, _) => await CheckUpdatesAsync();
+        settingsPane.ConfigurePennyImport(host.ReadSettings().AutoImportPenny, enabled =>
+        {
+            try { host.SetAutoImportPenny(enabled); return null; }
+            catch { return "Could not save Penny import preference."; }
+        });
         settingsPane.OpenUpdateRequested += (_, _) => OpenUpdate();
         RefreshUpdates();
         settingsPane.SetRunning(host.Snapshot().Running);

@@ -21,6 +21,21 @@ public partial class SettingsPane : System.Windows.Controls.UserControl
         StartupToggle.Checked += Changed; StartupToggle.Unchecked += Changed;
     }
     public event EventHandler? BackRequested;
+    internal void ConfigurePennyImport(bool enabled, Func<bool, string?> save)
+    {
+        bool saved = enabled, changing = false;
+        PennyImportToggle.IsChecked = enabled;
+        void Changed(object sender, RoutedEventArgs e)
+        {
+            if (changing) return;
+            bool next = PennyImportToggle.IsChecked == true;
+            string? error = save(next);
+            if (error is null) saved = next;
+            else { changing = true; PennyImportToggle.IsChecked = saved; changing = false; }
+            SaveStatus.Text = error ?? "Settings saved.";
+        }
+        PennyImportToggle.Checked += Changed; PennyImportToggle.Unchecked += Changed;
+    }
     public event EventHandler? DiscordRequested;
     private void DiscordClicked(object sender, RoutedEventArgs e) => DiscordRequested?.Invoke(this, EventArgs.Empty);
     private readonly Func<bool, string?> saveLaunch;

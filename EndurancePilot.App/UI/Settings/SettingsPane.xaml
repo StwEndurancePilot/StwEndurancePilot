@@ -30,6 +30,13 @@
             <ui:Button Content="Manage Discord pairing" HorizontalAlignment="Stretch" Click="DiscordClicked" />
           </StackPanel>
         </Border>
+        <TextBlock Text="ACCOUNTS" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PilotSecondary}" Margin="0,0,0,12" />
+        <Border CornerRadius="12" Background="{DynamicResource PilotSurface}" BorderBrush="{DynamicResource PilotBorder}" BorderThickness="1" Margin="0,0,0,24">
+          <StackPanel Margin="18">
+            <ui:ToggleSwitch x:Name="PennyImportToggle" Content="Import from Penny on startup" AutomationProperties.Name="Import from Penny on startup" />
+            <TextBlock Text="Check Penny Launcher for new accounts every time Pilot opens. Existing usernames are skipped and your selected account stays unchanged." FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource PilotSecondary}" Margin="0,6,0,0" />
+          </StackPanel>
+        </Border>
         <TextBlock Text="BACKGROUND" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PilotSecondary}" Margin="0,0,0,12" />
         <Border CornerRadius="12" Background="{DynamicResource PilotSurface}" BorderBrush="{DynamicResource PilotBorder}" BorderThickness="1" Margin="0,0,0,24">
           <StackPanel Margin="18">

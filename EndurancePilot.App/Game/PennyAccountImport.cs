@@ -72,15 +72,12 @@ internal static class PennyAccountImport
         return ProtectedData.Unprotect(envelope[5..], null, DataProtectionScope.CurrentUser);
     }
 
-    internal static void ImportOnce(EpicAccounts accounts)
+    internal static void ImportOnStartup(EpicAccounts accounts, bool enabled)
     {
-        string marker = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EndurancePilot", "penny-import-v1.done");
-        if (File.Exists(marker)) return;
+        if (!enabled) return;
         try
         {
             Import(accounts);
-            Directory.CreateDirectory(Path.GetDirectoryName(marker)!);
-            File.WriteAllText(marker, "1");
         }
         catch (Exception error) when (error is InvalidOperationException or IOException or UnauthorizedAccessException)
         { /* Leave it retryable; manual import displays a safe error in Manage Accounts. */ }

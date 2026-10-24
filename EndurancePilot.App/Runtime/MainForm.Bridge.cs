@@ -48,7 +48,7 @@ public sealed partial class MainForm
 
     internal RunnerSettings ReadSettings() => new((HomebaseZone)zone.SelectedItem!, (int)runLimit.Value,
         launchIfMissing.Checked, indefinite.Checked, manualThemeEnabled, manualDarkTheme, targetWave, webhook,
-        endRunWhenTargetReached, waitForAssistance, autoResumeFortnite, autoResumeIdleSeconds, startStopHotkey, closeToTray, startWithWindows);
+        endRunWhenTargetReached, waitForAssistance, autoResumeFortnite, autoResumeIdleSeconds, startStopHotkey, closeToTray, startWithWindows, autoImportPenny);
     internal void SetLifecycle(bool closeToTray, bool startup)
     {
         bool previousStartup = startWithWindows;
@@ -98,6 +98,11 @@ public sealed partial class MainForm
         if (stopButton is not null) stopButton.Text = "Stop · " + choice;
         status.Text = "Start/stop shortcut: " + choice;
     }
+    internal void SetAutoImportPenny(bool enabled)
+    {
+        settingsStore.Save(ReadSettings() with { AutoImportPenny = enabled });
+        autoImportPenny = enabled;
+    }
     private bool RestoreHotkey(string choice, bool wasRegistered)
     {
         if (!wasRegistered)
@@ -146,7 +151,7 @@ public sealed partial class MainForm
         endRunWhenTargetReached = value.EndRunWhenTargetReached;
         waitForAssistance = value.WaitForAssistance;
         closeToTray = value.CloseToTray;
-        startWithWindows = value.StartWithWindows;
+        startWithWindows = value.StartWithWindows; autoImportPenny = value.AutoImportPenny;
         autoResumeFortnite = value.AutoResumeFortnite;
         autoResumeIdleSeconds = value.AutoResumeIdleSeconds;
         ConfigureWebhook(value.Webhook!);

@@ -28,6 +28,7 @@ public sealed partial class MainForm : Form
     private bool waitForAssistance;
     private bool closeToTray = true;
     private bool startWithWindows;
+    private bool autoImportPenny = true;
     private bool autoResumeFortnite;
     private int autoResumeIdleSeconds;
     private readonly NumericUpDown runLimit = new() { Minimum = 1, Maximum = 100, Value = 1, Width = 60 };
@@ -110,7 +111,7 @@ public sealed partial class MainForm : Form
         endRunWhenTargetReached = saved.EndRunWhenTargetReached;
         waitForAssistance = saved.WaitForAssistance;
         closeToTray = saved.CloseToTray;
-        startWithWindows = saved.StartWithWindows;
+        startWithWindows = saved.StartWithWindows; autoImportPenny = saved.AutoImportPenny;
         autoResumeFortnite = saved.AutoResumeFortnite;
         autoResumeIdleSeconds = saved.AutoResumeIdleSeconds;
         launchIfMissing.Checked = saved.LaunchIfMissing;
