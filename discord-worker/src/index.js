@@ -167,8 +167,13 @@ export class Device {
       if (typeof body.content !== 'string' || body.content.length > 1900) return json({ error: 'Invalid response' }, 400);
       let menus = [];
       if (body.accounts != null) {
-        if (p.command !== 'switch' || p.account != null) return json({ error: 'Invalid account menu' }, 400);
-        try { menus = accountMenus(body.accounts, body.accountSet); } catch { return json({ error: 'Invalid account menu' }, 400); }
+        if (!['switch', 'accounts'].includes(p.command) || p.account != null) return json({ error: 'Invalid account menu' }, 400);
+        try {
+          // Validate the account list even for read-only pairings; only render controls
+          // when the desktop supplies its selection fingerprint.
+          const choices = accountMenus(body.accounts, body.accountSet ?? '0'.repeat(64));
+          if (body.accountSet != null) menus = choices;
+        } catch { return json({ error: 'Invalid account menu' }, 400); }
       }
       let image;
       if (body.image != null) {
@@ -181,7 +186,7 @@ export class Device {
       p.resultReceived = true;
       delete p.proof;
       await this.save(state);
-      try { await this.respond(p, body.content, image, menus); }
+      try { await this.respond(p, body.content, image, menus, body.accounts); }
       catch (error) {
         return json({ error: 'Discord reply delivery failed', discordStatus: error.discordStatus ?? null }, 502);
       }
@@ -197,8 +202,8 @@ export class Device {
     if (deadlines.length) await this.storage.setAlarm(Math.max(Date.now() + 1000, Math.min(...deadlines)));
     else await this.storage.deleteAlarm();
   }
-  async respond(p, content, image, menus = []) {
-    const payload = message(p.command, content, !!image);
+  async respond(p, content, image, menus = [], accounts = null) {
+    const payload = message(p.command, content, !!image, accounts);
     payload.components = menus;
     let body;
     const headers = { 'User-Agent': 'DiscordBot (https://github.com/StwEndurancePilot/StwEndurancePilot, 1.0)' };

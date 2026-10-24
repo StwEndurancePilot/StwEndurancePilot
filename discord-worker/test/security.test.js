@@ -291,11 +291,11 @@ test('network failure retains the command deadline for a fallback reply', async 
   assert.ok(f.instances.get(userA).alarm());
 });
 
-test('switch returns live choices without storing account names and queues a bound selection', async () => {
+test('accounts returns live choices without storing account names and queues a bound selection', async () => {
   const f = fixture();
   const { token } = await f.pair(userA);
   await f.device(userA, 'poll', token);
-  await f.interaction(userA, 'switch');
+  await f.interaction(userA, 'accounts');
   const { command } = await (await f.device(userA, 'poll', token)).json();
   assert.equal(command.account, undefined);
   const entry = f.instances.get(userA);

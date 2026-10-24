@@ -28,3 +28,20 @@ test('command embeds suppress mentions, separate metrics and embed screenshots',
   assert.deepEqual(message('progress','Runner: running\nWave: 14').embeds[0].fields.map(f=>f.value), ['running','14']);
   assert.equal(message('screenshot','Current game',true).embeds[0].image.url, 'attachment://game.jpg');
 });
+
+test('missing Fortnite is a complete error embed, never a capture success or plain text', () => {
+  const result = message('screenshot', 'No visible Fortnite window was found.');
+  assert.equal(result.content, '');
+  const embed = result.embeds[0];
+  assert.equal(embed.title, 'Screenshot unavailable · Fortnite not found');
+  assert.equal(embed.color, 0xDE777B);
+  assert.match(embed.fields[0].value, /Open Fortnite/);
+  assert.equal(embed.image, undefined);
+  assert.match(embed.footer.text, /not completed/);
+});
+test('accounts embed presents selected account and count with no separate switch command', () => {
+  const result = message('accounts', 'Choose an account below.', false, [{ number: 1, name: 'Saved account', selected: true }]);
+  assert.equal(result.embeds[0].fields[0].value, 'Saved account');
+  assert.equal(result.embeds[0].fields[1].value, '1');
+  assert.equal(JSON.stringify(result).includes('/pilot switch'), false);
+});

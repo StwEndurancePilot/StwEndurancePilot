@@ -1,17 +1,44 @@
 // Discord-native presentation: restrained colour, clear titles and compact metrics.
 const titles = { progress: 'Run progress', statistics: 'Session & lifetime', accounts: 'Your accounts', switch: 'Choose an account', login: 'Connect an Epic account', screenshot: 'Fortnite · live capture', menu: 'Pilot window', start: 'Runner control', stop: 'Runner control', launch: 'Fortnite launch', notice: 'Endurance Pilot' };
-export function message(command, content, image = false) {
+export function message(command, content, image = false, accounts = null) {
   const embed = { title: titles[command] ?? titles.notice, description: content, color: 0xB8C8BE };
   const confirmed = { start: ['Runner started', 'Run started'], stop: ['Runner stopped', 'Run stopped'], launch: ['Fortnite launch requested', 'Launching Fortnite'], menu: ['Pilot is visible', 'Pilot is open'], switch: ['Selected account changed', 'Account selected'] }[command];
   if (confirmed && content.startsWith(confirmed[0])) { embed.title = confirmed[1]; embed.color = 0x88B79D; }
-  if (/could not|couldn’t|failed|not permitted|disabled|unavailable|offline|did not respond|not be delivered/i.test(content)) { embed.color = 0xD6AB78; embed.footer = { text: 'Check Pilot on your PC' }; }
-  if (['progress', 'statistics'].includes(command) && content.includes('\n') && content.split('\n').every(line => line.includes(': '))) {
+  const failure = failureDetails(command, content, image);
+  if (failure) {
+    embed.title = failure.title;
+    embed.color = 0xDE777B;
+    embed.fields = [{ name: 'What to do next', value: failure.next }];
+    embed.footer = { text: 'Endurance Pilot · Action not completed' };
+  }
+  if (!failure && ['progress', 'statistics'].includes(command) && content.includes('\n') && content.split('\n').every(line => line.includes(': '))) {
     embed.fields = content.split('\n').slice(0, 25).map(line => { const at = line.indexOf(': '); return { name: line.slice(0, at).slice(0, 256), value: line.slice(at + 2).slice(0, 1024) || '—', inline: true }; });
     delete embed.description;
   }
-  if (command === 'accounts') embed.footer = { text: 'Use /pilot switch to choose an account' };
+  if (accounts?.length) {
+    embed.title = 'Your accounts'; embed.color = 0xB8C8BE;
+    const selected = accounts.find(a => a.selected);
+    embed.fields = [
+      { name: 'Selected for launch', value: selected?.name ?? 'No account selected', inline: true },
+      { name: 'Saved on this PC', value: String(accounts.length), inline: true }
+    ];
+    embed.footer = { text: 'Account changes apply to your next Fortnite launch' };
+  }
   if (image) embed.image = { url: 'attachment://game.jpg' };
   return { content: '', embeds: [embed], allowed_mentions: { parse: [] }, attachments: [], components: [] };
+}
+function failureDetails(command, content, image) {
+  if (command === 'screenshot' && !image) {
+    if (/No visible Fortnite window/i.test(content)) return { title: 'Screenshot unavailable · Fortnite not found', next: 'Open Fortnite on your paired PC, then run `/pilot screenshot` again.' };
+    if (/disabled|not permitted/i.test(content)) return { title: 'Screenshot blocked · Permission required', next: 'Enable screenshot access by pairing again in Pilot, then retry.' };
+    return { title: 'Screenshot could not be captured', next: 'Check that Fortnite is open and its game window is available on your PC, then retry `/pilot screenshot`.' };
+  }
+  if (/^No saved accounts/i.test(content)) return { title: 'No accounts connected', next: 'Use `/pilot login` to connect an Epic account, then open `/pilot accounts`.' };
+  if (/^Your PC is offline/i.test(content)) return { title: 'PC unavailable', next: 'Open Pilot on your paired PC and check its connection, then retry your command.' };
+  if (/^Your saved accounts have changed/i.test(content)) return { title: 'Account list has changed', next: 'Open `/pilot accounts` again and choose from the updated dropdown.' };
+  if (/^(Stop the runner|Finish account sign-in)/i.test(content)) return { title: 'Action blocked · PC is busy', next: 'Finish the activity described above on your PC, then try again.' };
+  if (/could not|couldn’t|failed|not permitted|disabled|unavailable|offline|did not respond|not be delivered/i.test(content)) return { title: 'Action could not be completed', next: 'Check Pilot on your PC before repeating the command.' };
+  return null;
 }
 export function accountMenus(accounts, snapshot) {
   if (!/^[a-f0-9]{64}$/.test(snapshot ?? '') || !Array.isArray(accounts) || accounts.length < 1 || accounts.length > 100) throw new Error('Invalid account menu');

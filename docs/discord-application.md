@@ -38,8 +38,7 @@ The workflow is separate from Windows releases. It pins GitHub actions to commit
 | --- | --- |
 | `/pilot progress` | Running/stopped state, attention flag, wave and completed session runs |
 | `/pilot statistics` | Session/lifetime completed runs and lifetime reward totals |
-| `/pilot accounts` | Saved account numbers and display names, selected account, sign-in status |
-| `/pilot switch account:2` | Select account 2 for the next launch; runner must be stopped and Fortnite closed |
+| `/pilot accounts` | Account embed with the current selection and dropdowns to switch saved accounts; runner must be stopped and Fortnite closed to switch |
 | `/pilot login` | Get an Epic website approval link; account credentials are acquired and encrypted on the PC |
 | `/pilot screenshot` | Capture the Fortnite window using Windows Graphics Capture; requires screenshot permission |
 | `/pilot menu` | Show the already-running Pilot window on the PC |

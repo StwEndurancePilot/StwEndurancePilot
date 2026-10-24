@@ -3,7 +3,7 @@ if (!/^\d{17,20}$/.test(id ?? '') || !token) throw new Error('Discord registrati
 const descriptions = {
 
   progress: 'Current runner state and wave', statistics: 'Completed runs and lifetime rewards',
-  accounts: 'Show your saved accounts', switch: 'Select an account for the next game launch',
+  accounts: 'View and switch your saved accounts',
   login: 'Approve a new Epic account on Epic’s website', screenshot: 'Capture only the Fortnite window',
   menu: 'Show the Pilot window on your PC', start: 'Start endurance using saved settings',
   stop: 'Stop the runner', launch: 'Launch Fortnite with the selected account'
