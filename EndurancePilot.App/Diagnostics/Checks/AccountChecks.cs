@@ -22,7 +22,7 @@ internal static class AccountChecks
             string source = path + ".penny";
             try
             {
-                string id = new('a', 32), device = new('b', 32), secret = new('c', 32);
+                string id = new('a', 32), device = new('b', 32), secret = new('z', 32);
                 File.WriteAllText(source, System.Text.Json.JsonSerializer.Serialize(new[] {
                     new { accountId = id, displayName = "Imported", deviceId = device, secret },
                     new { accountId = new string('d', 32), displayName = " imported ", deviceId = device, secret },

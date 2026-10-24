@@ -49,7 +49,7 @@ internal static class PennyAccountImport
                 catch (Exception error) when (error is CryptographicException or FormatException or IOException or UnauthorizedAccessException or JsonException or KeyNotFoundException or InvalidOperationException)
                 { invalid++; continue; }
                 bool Hex(string value) => Regex.IsMatch(value, @"\A[a-fA-F0-9]{32}\z");
-                if (!Hex(id) || !Hex(device) || !Hex(secret) || name.Length is < 1 or > 100 || name.Any(char.IsControl)) { invalid++; continue; }
+                if (!Hex(id) || !Hex(device) || !Regex.IsMatch(secret, @"\A[a-zA-Z0-9]{32}\z") || name.Length is < 1 or > 100 || name.Any(char.IsControl)) { invalid++; continue; }
                 candidates.Add(new(id, name, device, secret));
             }
             }
