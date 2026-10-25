@@ -65,7 +65,9 @@ internal sealed class DiscordRemote : IDisposable
                 {
                     Validate(configuration.Origin, configuration.UserId);
                     RemoteCommandProof.ValidateIdentity(configuration.ApplicationId, configuration.DiscordPublicKey);
-                    using var key = RemoteDeviceKey.Open(configuration.KeyName);
+                    // Restore the pairing independently of key-store availability at startup.
+                    // Opening/signing with the key is validated by RunAsync and retried there.
+                    // A temporary CNG failure must not turn a saved pairing into an unpaired PC.
                     // Legacy KeyExpires is retained for file compatibility only.
                     // A saved pairing lasts until explicit revocation, including across upgrades.
                 }

@@ -14,6 +14,18 @@ internal static class RemoteSecurityChecks
     private const string User = "111111111111111111", App = "333333333333333333";
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
+    internal static void WriteRestartFixture(string path)
+    {
+        string key = RemoteDeviceKey.Create();
+        try
+        {
+            var config = new RemoteConfiguration("https://pilot.example", User, key, false, false,
+                App, new string('a', 64), 0, long.MaxValue);
+            RemoteReplayJournal.WriteProtected(path, JsonSerializer.SerializeToUtf8Bytes(config, Json));
+        }
+        catch { RemoteDeviceKey.Delete(key); throw; }
+    }
+
     internal static async Task<IReadOnlyList<StartupCheck>> RunAsync(string directory)
     {
         Directory.CreateDirectory(directory);
@@ -196,6 +208,65 @@ internal static class RemoteSecurityChecks
             RemoteDeviceKey.Delete(persistentKey);
             foreach (var suffix in new[] { "", ".lock", ".replay" }) if (File.Exists(persistentPath + suffix)) File.Delete(persistentPath + suffix);
         }
+        string processPath = Path.GetFullPath(Path.Combine(directory, "process-restart-" + Guid.NewGuid().ToString("N") + ".bin"));
+        string? processKey = null;
+        try
+        {
+            var start = new System.Diagnostics.ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = false, CreateNoWindow = true };
+            if (string.Equals(Path.GetFileNameWithoutExtension(Environment.ProcessPath), "dotnet", StringComparison.OrdinalIgnoreCase))
+                start.ArgumentList.Add(typeof(RemoteSecurityChecks).Assembly.Location);
+            start.ArgumentList.Add("--write-discord-restart-fixture");
+            start.ArgumentList.Add(processPath);
+            using var child = System.Diagnostics.Process.Start(start)!;
+            try { await child.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(30)); }
+            finally { if (!child.HasExited) { child.Kill(); await child.WaitForExitAsync(); } }
+            using var reopened = new DiscordRemote((_, _, _) => throw new Exception("No command expected"), processPath);
+            processKey = reopened.Configuration?.KeyName;
+            Check("Pairing survives complete exit of the process that created it", child.ExitCode == 0 && processKey is not null);
+            if (processKey is not null)
+            {
+                using var verifier = ECDsa.Create();
+                verifier.ImportSubjectPublicKeyInfo(Convert.FromBase64String(RemoteDeviceKey.PublicKey(processKey)), out _);
+                string signature = RemoteDeviceKey.Sign(processKey, config.Origin, User, "connect", "", "1", "test", "GET");
+                string message = $"pilot-device-v2\nGET\n{config.Origin}/device/{User}/connect\n1\ntest\n{Convert.ToHexStringLower(SHA256.HashData([]))}";
+                Check("Windows signing key works after its creating process has exited", verifier.VerifyData(Encoding.UTF8.GetBytes(message), Convert.FromHexString(signature), HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation));
+            }
+        }
+        catch (Exception error) { checks.Add(new("Pairing across process exit", false, error.GetType().Name)); }
+        finally
+        {
+            if (processKey is not null) RemoteDeviceKey.Delete(processKey);
+            foreach (var suffix in new[] { "", ".lock", ".replay" }) if (File.Exists(processPath + suffix)) File.Delete(processPath + suffix);
+        }
+
+        string delayedPath = Path.Combine(directory, "delayed-key-" + Guid.NewGuid().ToString("N") + ".bin");
+        string delayedKey = "EndurancePilot.Discord." + Guid.NewGuid().ToString("N");
+        bool keyCreated = false;
+        try
+        {
+            var saved = config with { KeyName = delayedKey };
+            RemoteReplayJournal.WriteProtected(delayedPath, JsonSerializer.SerializeToUtf8Bytes(saved, Json));
+            var transport = new Handler(null);
+            using var restored = new DiscordRemote((_, _, _) => throw new Exception("No command expected"), delayedPath, transport);
+            Check("Unavailable Windows key does not discard saved pairing", restored.Configuration == saved);
+            restored.Start();
+            Check("Unavailable Windows key sends no unauthenticated requests", transport.SignedCount == 0 && transport.PairBody == "");
+            using (var key = CngKey.Create(CngAlgorithm.ECDsaP256, delayedKey, new CngKeyCreationParameters
+            {
+                Provider = CngProvider.MicrosoftSoftwareKeyStorageProvider,
+                ExportPolicy = CngExportPolicies.None, KeyUsage = CngKeyUsages.Signing
+            })) { keyCreated = true; }
+            transport.publicKey = RemoteDeviceKey.PublicKey(delayedKey);
+            await transport.Polled.Task.WaitAsync(TimeSpan.FromSeconds(20));
+            Check("Startup retries signing when Windows key becomes available without re-pairing",
+                restored.Configuration == saved && transport.SignaturesValid && transport.PairBody == "");
+        }
+        catch (Exception error) { checks.Add(new("Delayed Windows key recovery", false, error.GetType().Name)); }
+        finally
+        {
+            if (keyCreated) RemoteDeviceKey.Delete(delayedKey);
+            foreach (var suffix in new[] { "", ".lock", ".replay" }) if (File.Exists(delayedPath + suffix)) File.Delete(delayedPath + suffix);
+        }
         return checks;
     }
 
@@ -206,7 +277,7 @@ internal static class RemoteSecurityChecks
         internal int SignedCount;
         internal bool FailRevoke;
         internal bool FailPollOnce;
-        private string? publicKey = savedPublicKey;
+        internal string? publicKey = savedPublicKey;
         internal TaskCompletionSource Polled = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private bool delivered;
         private readonly List<WebSocket> sockets = [];

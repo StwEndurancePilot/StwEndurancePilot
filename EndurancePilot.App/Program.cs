@@ -126,6 +126,11 @@ static class Program
             catch (Exception error) { File.WriteAllText(args[1], System.Text.Json.JsonSerializer.Serialize(new { Error = error.Message })); Environment.ExitCode = 1; }
             return;
         }
+        if (args.Length == 2 && args[0] == "--write-discord-restart-fixture")
+        {
+            RemoteSecurityChecks.WriteRestartFixture(args[1]);
+            return;
+        }
         if (args.Length == 2 && args[0] == "--check-discord-remote")
         {
             var checks = RemoteChecks.Run().Concat(RemoteSecurityChecks.RunAsync(Path.GetDirectoryName(Path.GetFullPath(args[1]))!).GetAwaiter().GetResult()).ToArray();
