@@ -130,7 +130,7 @@
         <Border CornerRadius="12" Background="{DynamicResource PilotSurface}" BorderBrush="{DynamicResource PilotBorder}" BorderThickness="1" Padding="18">
           <StackPanel>
             <TextBlock Text="Keep Fortnite in the foreground" FontSize="14" FontWeight="SemiBold" />
-            <TextBlock Text="While the runner is active, Pilot restores and focuses Fortnite automatically before acting. Stop the runner to use other windows freely." FontSize="12" TextWrapping="Wrap" LineHeight="18" Foreground="{DynamicResource PilotSecondary}" Margin="0,6,0,0" />
+            <TextBlock Text="Pilot focuses Fortnite automatically before acting. While Endurance waves run, you can use other windows: Pilot switches back once keyboard and mouse are idle for 2 seconds when input is needed, then returns you to your window after the next run starts. Use Windowed Fullscreen and keep Fortnite unminimized." FontSize="12" TextWrapping="Wrap" LineHeight="18" Foreground="{DynamicResource PilotSecondary}" Margin="0,6,0,0" />
             <ui:ToggleSwitch x:Name="FocusWhenIdleToggle" Visibility="Collapsed" />
             <ui:NumberBox x:Name="FocusIdleSecondsInput" Visibility="Collapsed" Minimum="2" Maximum="600" />
           </StackPanel>
