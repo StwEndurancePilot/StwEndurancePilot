@@ -334,12 +334,23 @@ public sealed partial class MainForm : Form
                         WaitForUserInput("Waiting for Fortnite focus.");
                     }
 
-                    bool resumeUnattended = runner.IsRunning && runner.Mode != RunnerMode.Observe
+                    // Background endurance: leave the PC to the user while waves just run.
+                    bool passiveEndurance = PassiveEndurance();
+                    if (passiveEndurance) userLeftDuringEndurance = true;
+                    bool resumeUnattended = !passiveEndurance && runner.IsRunning && runner.Mode != RunnerMode.Observe
                         && controller.Status is ControllerStatus.Observing or ControllerStatus.AwaitingTransition;
+                    // Only take focus back once keyboard and mouse have been idle briefly.
+                    if (resumeUnattended && userLeftDuringEndurance && !UserIdleFor(BackgroundIdleBeforeFocus))
+                    {
+                        resumeUnattended = false;
+                        status.Text = "Action needed in Fortnite · switching when keyboard and mouse are idle for 2 s";
+                    }
                     controller.InvalidateObservation();
                     bool focused = false;
                     if (resumeUnattended)
                     {
+                        RememberReturnWindow(game);
+                        userLeftDuringEndurance = false;
                         int focusingSession = session;
                         busy = true;
                         try { focused = await GameInput.FocusForAutomationAsync(game, closing.Token); }
@@ -401,6 +412,10 @@ public sealed partial class MainForm : Form
                 }
                 backgroundCapture?.Dispose();
                 backgroundCapture = null;
+                if (await ReturnToUserWindowAsync(game))
+                {
+                    return;
+                }
                 if (!InputReady(game))
                 {
                     return;
