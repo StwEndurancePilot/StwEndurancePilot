@@ -371,7 +371,19 @@ internal static class NavigationScenarios
         var triangleRetry = ObserveHomebase(2.5, persistentHover);
         check("Triangle retry reacquires fresh evidence in under three seconds", triangleRetry?.Step == NavigationStep.SelectHomebase);
         clickSequence.Dispatched(triangleRetry!, epoch.AddSeconds(2.56));
-        ObserveHomebase(4.6, persistentHover);
+        // The homebase icon gets up to five attempts before pausing.
+        double at = 2.56;
+        for (int extra = 0; extra < 3; extra++)
+        {
+            ObserveHomebase(at + 2.04, persistentHover);
+            ObserveHomebase(at + 2.24, persistentHover);
+            var again = ObserveHomebase(at + 2.34, persistentHover) ?? ObserveHomebase(at + 2.5, persistentHover);
+            check($"Homebase retry {extra + 3} is attempted while the map settles", again?.Step == NavigationStep.SelectHomebase);
+            if (again is null) break;
+            at = (again.ObservedAt - epoch).TotalSeconds + .06;
+            clickSequence.Dispatched(again, epoch.AddSeconds(at));
+        }
+        ObserveHomebase(at + 2.1, persistentHover);
         check("Repeated failed selection pauses instead of clicking forever", clickSequence.Status == ControllerStatus.PausedForAttention);
         check("Different zone heading still blocks homebase entry", NavigationPlanner.Decide(visibleControl, recognizer.Recognize(visibleControl), profile with
         {
