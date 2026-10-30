@@ -130,7 +130,7 @@
         <Border x:Name="FocusGuidance" CornerRadius="12" Background="{DynamicResource PilotSurface}" BorderBrush="{DynamicResource PilotBorder}" BorderThickness="1" Padding="18">
           <StackPanel>
             <TextBlock Text="Monitor in the background" FontSize="14" FontWeight="SemiBold" />
-            <TextBlock Text="Pilot monitors the Fortnite window when capture is available, without focusing or restoring it. Controls resume when you return to Fortnite. Pause keeps controls off until Resume; Stop ends the session." FontSize="12" TextWrapping="Wrap" LineHeight="18" Foreground="{DynamicResource PilotSecondary}" Margin="0,6,0,0" />
+            <TextBlock Text="Pilot reads wave starts from Fortnite's local log even while minimized. Live countdowns and rewards need window capture. Controls resume when you return to Fortnite. Pause keeps controls off until Resume; Stop ends the session." FontSize="12" TextWrapping="Wrap" LineHeight="18" Foreground="{DynamicResource PilotSecondary}" Margin="0,6,0,0" />
           </StackPanel>
         </Border>
         <TextBlock Text="SHORTCUT" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PilotSecondary}" Margin="0,24,0,12" />

@@ -39,7 +39,9 @@ public sealed partial class MainForm
             token.ThrowIfCancellationRequested();
             snapshot = Snapshot();
             var now = DateTimeOffset.UtcNow;
-            if (game is null) wave = "Fortnite is closed, minimized or unavailable";
+            if (game is null && snapshot.LogWave is { } reported)
+                wave = $"Last reported: {reported.Wave} / 30 (local game log; countdown unavailable)";
+            else if (game is null) wave = "Fortnite is closed, minimized or unavailable";
             else if (wave == "Not visible" && tracker.Current is { Outcome: RunOutcome.InProgress } current
                 && now - tracker.LastConfirmedWaveAt < TimeSpan.FromMinutes(3))
                 wave = $"Last confirmed: {current.HighestWave} / 30 ({Math.Max(0, (int)(now - tracker.LastConfirmedWaveAt).TotalSeconds)}s ago)";

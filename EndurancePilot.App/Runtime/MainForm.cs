@@ -10,6 +10,7 @@ public sealed partial class MainForm : Form
     private readonly TextBox details = new() { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Both, Dock = DockStyle.Fill, WordWrap = false };
     private OcrService? ocr;
     private BackgroundGameCapture? backgroundCapture;
+    private readonly FortniteLogMonitor gameLog = new();
     private readonly ScreenRecognizer recognizer = new();
     private readonly VisualRecognizer visualRecognizer = new();
     private readonly RunnerSession runner = new();
@@ -164,6 +165,7 @@ public sealed partial class MainForm : Form
             var cycleClock = System.Diagnostics.Stopwatch.StartNew();
             try
             {
+                if (runner.IsRunning) gameLog.Poll(DateTimeOffset.UtcNow);
                 if (runnerMode)
                 {
                     var processes = EpicLauncher.Inspect();
@@ -326,7 +328,9 @@ public sealed partial class MainForm : Form
                     runner.ReacquireInput();
                     interactionPause.Begin();
                     timer.Interval = 500;
-                    status.Text = "Waiting for a visible Fortnite window · open or restore it yourself. Stop and Start to request a new launch.";
+                    status.Text = gameLog.Latest is not null
+                        ? "Monitoring Fortnite's local wave log · screen countdown and game controls wait until the game is restored."
+                        : "Waiting for a visible Fortnite window or a wave event in its local log.";
                     RefreshProgress();
                     return;
                 }
@@ -476,6 +480,7 @@ public sealed partial class MainForm : Form
         var chosen = ReadSettings();
         chosen.Validate();
         settingsStore.Save(chosen);
+        gameLog.Reset();
         CancelInput();
         session++;
         launcher.Stop();
@@ -520,6 +525,7 @@ public sealed partial class MainForm : Form
 
     private void Stop(string reason)
     {
+        gameLog.Reset();
         CancelInput();
         interactionPause.Clear();
         Notify(WebhookEvent.RunnerStopped, "Runner stopped", reason + " Stopping the runner does not itself leave an active Fortnite mission.", tracker.Current?.HighestWave);

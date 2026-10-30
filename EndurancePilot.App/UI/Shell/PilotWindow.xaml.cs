@@ -173,14 +173,17 @@ public partial class PilotWindow : FluentWindow
         StatusDetail.Visibility = string.IsNullOrWhiteSpace(StatusDetail.Text) ? Visibility.Collapsed : Visibility.Visible;
         StatusDetail.ToolTip = StatusDetail.Text;
         PrimaryButton.ToolTip = StatusDetail.Text;
-        int? displayedWave = s.LiveWave?.Wave ?? s.Wave;
+        int? displayedWave = s.LiveWave?.Wave ?? s.LogWave?.Wave ?? s.Wave;
         WaveNumber.Text = (displayedWave ?? 0).ToString("00");
-        WavePhaseLabel.Text = s.LiveWave is { Starting: true } ? "NEXT WAVE" : s.LiveWave is not null ? "ACTIVE WAVE" : "WAVE PROGRESS";
-        WaveTimerLabel.Text = s.LiveWave is { Starting: true } ? "STARTS IN" : "WAVE REMAINING";
-        WaveTimerText.Text = s.LiveWave is { } live ? $"{(int)live.Remaining.TotalMinutes}:{live.Remaining.Seconds:D2}" : "--:--";
+        WavePhaseLabel.Text = s.LiveWave is { Starting: true } ? "NEXT WAVE" : s.LiveWave is not null ? "ACTIVE WAVE" : s.LogWave is not null ? "LAST REPORTED WAVE" : "WAVE PROGRESS";
+        WaveTimerLabel.Text = s.LiveWave is { Starting: true } ? "STARTS IN" : s.LiveWave is not null || s.LogWave is null ? "WAVE REMAINING" : "SINCE WAVE START";
+        var reportedAge = s.LogWave is { } report ? DateTimeOffset.UtcNow - report.StartedAt : TimeSpan.Zero;
+        WaveTimerText.Text = s.LiveWave is { } live ? $"{(int)live.Remaining.TotalMinutes}:{live.Remaining.Seconds:D2}"
+            : s.LogWave is not null ? $"{Math.Max(0, (int)reportedAge.TotalMinutes)}:{Math.Max(0, reportedAge.Seconds):D2}" : "--:--";
         ElapsedText.Text = $"{(int)Math.Max(0, s.Elapsed.TotalHours):D2}:{s.Elapsed.Minutes:D2}:{s.Elapsed.Seconds:D2}";
         WaveFreshnessText.Text = s.LiveWave is { Remaining: var remaining } ? remaining == TimeSpan.Zero
             ? "Waiting for the game to confirm the next phase" : "Live game timer"
+            : s.LogWave is not null ? "Source: local game log · remaining time needs a game frame"
             : s.WaveAge is { } age ? $"Last confirmed wave {s.Wave} · {Math.Max(0, (int)age.TotalSeconds)}s ago · waiting for HUD"
             : "Waiting for a fresh game frame";
         int targetWave = host.ReadSettings().EndRunWhenTargetReached ? host.ReadSettings().TargetWave : 30;
@@ -212,7 +215,8 @@ public partial class PilotWindow : FluentWindow
         settingsPane?.SetWebhookStatus(host.WebhookStatus);
         for (int i = 0; i < WaveSegments.Children.Count; i++)
         {
-            ((Border)WaveSegments.Children[i]).SetResourceReference(Border.BackgroundProperty, i < (s.Wave ?? 0) ? "PilotAccent" : "PilotTrack");
+            int progressWave = s.LiveWave is { Starting: true } upcoming ? upcoming.Wave - 1 : displayedWave ?? 0;
+            ((Border)WaveSegments.Children[i]).SetResourceReference(Border.BackgroundProperty, i < progressWave ? "PilotAccent" : "PilotTrack");
         }
 
         if (activityText is not null && activityText.Text != s.Activity)

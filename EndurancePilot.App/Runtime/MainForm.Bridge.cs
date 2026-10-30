@@ -3,7 +3,7 @@ using EndurancePilot.Core;
 namespace EndurancePilot.App;
 
 internal sealed record PilotSnapshot(bool Running, bool Attention, bool Paused, bool Background, string Headline, string Detail, int? Wave,
-    int Completed, string Activity, WaveProgressSnapshot? LiveWave, TimeSpan Elapsed, TimeSpan? WaveAge);
+    int Completed, string Activity, WaveProgressSnapshot? LiveWave, TimeSpan Elapsed, TimeSpan? WaveAge, GameLogWave? LogWave);
 
 public sealed partial class MainForm
 {
@@ -191,7 +191,9 @@ public sealed partial class MainForm
             else if (background)
             {
                 heading = "Monitoring in background";
-                detail = status.Text.StartsWith("Waiting for a") || status.Text.StartsWith("Background capture")
+                detail = gameLog.Latest is not null
+                    ? "Wave updates continue from Fortnite's local log, including while minimized. Game controls wait until you return."
+                    : status.Text.StartsWith("Waiting for a") || status.Text.StartsWith("Background capture")
                     ? status.Text : "Return to Fortnite to resume game controls. Pilot will not focus or restore the game.";
             }
             else if (interactionPause.Active)
@@ -206,8 +208,11 @@ public sealed partial class MainForm
         var now = DateTimeOffset.UtcNow;
         var elapsed = runner.StartedAt is { } started ? (stoppedAt ?? now) - started : TimeSpan.Zero;
         var age = activeWave is not null && tracker.LastConfirmedWaveAt != default ? now - tracker.LastConfirmedWaveAt : (TimeSpan?)null;
+        var logWave = runner.IsRunning ? gameLog.Latest : null;
+        var liveWave = runner.WaveProgress.Snapshot(now);
+        if (logWave is not null && liveWave?.ObservedAt < logWave.StartedAt) liveWave = null;
         return new(runner.IsRunning, attention, InputPaused, background, heading, detail, activeWave, runSession.CompletedRuns,
-            string.Join(Environment.NewLine, activity.Items.Cast<string>().Reverse().Take(80)), runner.WaveProgress.Snapshot(now), elapsed, age);
+            string.Join(Environment.NewLine, activity.Items.Cast<string>().Reverse().Take(80)), liveWave, elapsed, age, logWave);
     }
     internal void ShowTechnicalDetails()
     {

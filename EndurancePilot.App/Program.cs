@@ -9,6 +9,13 @@ static class Program
 
         ApplicationConfiguration.Initialize();
         CompactNativeLibrary.Initialize();
+        if (args.Length == 2 && args[0] == "--inspect-game-log")
+        {
+            var monitor = new FortniteLogMonitor();
+            monitor.Poll(DateTimeOffset.UtcNow);
+            File.WriteAllText(args[1], System.Text.Json.JsonSerializer.Serialize(monitor.Latest, Inspection.Json));
+            return;
+        }
         if (args.Length == 2 && args[0] == "--analyze-current-screen")
         {
             try
@@ -144,7 +151,8 @@ static class Program
             var checks = StartupChecks.Run().Concat(SettingsChecks.Run(args[1])).Concat(AccountChecks.Run(args[1])).Concat(EpicAuthenticationChecks.RunAsync().GetAwaiter().GetResult()).Concat(RewardEarningsChecks.Run(args[1])).Concat(RewardReceiptChecks.Run(args[1])).Concat(WebhookChecks.RunAsync().GetAwaiter().GetResult())
                 .Concat(UpdateChecks.RunAsync().GetAwaiter().GetResult()).Concat(RemoteChecks.Run())
                 .Concat(RemoteSecurityChecks.RunAsync(args[1]).GetAwaiter().GetResult())
-                .Concat(KeyPressChecks.RunAsync().GetAwaiter().GetResult()).Concat(WaveNotificationChecks.Run()).ToArray();
+                .Concat(KeyPressChecks.RunAsync().GetAwaiter().GetResult()).Concat(WaveNotificationChecks.Run())
+                .Concat(FortniteLogChecks.Run(args[1])).ToArray();
             File.WriteAllText(Path.Combine(args[1], "startup-checks.json"), System.Text.Json.JsonSerializer.Serialize(checks, Inspection.Json));
             Environment.ExitCode = checks.All(c => c.Passed) ? 0 : 1;
             return;
