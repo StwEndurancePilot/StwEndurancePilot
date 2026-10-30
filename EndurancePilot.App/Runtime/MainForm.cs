@@ -401,7 +401,7 @@ public sealed partial class MainForm : Form
                 }
                 backgroundCapture?.Dispose();
                 backgroundCapture = null;
-                bool inputReady = InputReady(game);
+                bool inputReady = InputReady(game) && !gameLog.CatchingUp;
                 using var frame = game.Capture();
                 await Analyze(frame, game, cycleClock.Elapsed.TotalMilliseconds, observationOnly: !inputReady);
             }

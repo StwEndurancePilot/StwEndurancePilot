@@ -18,6 +18,7 @@ internal sealed class FortniteLogMonitor(string? path = null)
     internal GameLogWave? Latest { get; private set; }
     internal GameLogPlaytime? Playtime { get; private set; }
     internal DateTimeOffset? ResultAvailableAt { get; private set; }
+    internal bool CatchingUp { get; private set; }
 
     internal void Reset()
     {
@@ -26,6 +27,7 @@ internal sealed class FortniteLogMonitor(string? path = null)
         Latest = null;
         Playtime = null;
         ResultAvailableAt = null;
+        CatchingUp = false;
         position = 0;
         pending.Clear();
         skipLine = false;
@@ -63,12 +65,13 @@ internal sealed class FortniteLogMonitor(string? path = null)
                 creation = file.CreationTimeUtc;
                 progress = new(started);
                 // Bootstrap from a bounded recent tail, never archives from an old game.
-                position = Math.Max(0, stream.Length - 2 * 1024 * 1024);
+                position = Math.Max(0, stream.Length - 32 * 1024 * 1024);
                 skipLine = position > 0;
             }
             stream.Position = position;
             byte[] buffer = new byte[16384];
-            long remaining = Math.Min(stream.Length - position, 2 * 1024 * 1024);
+            long observedLength = stream.Length;
+            long remaining = Math.Min(observedLength - position, 2 * 1024 * 1024);
             while (remaining > 0)
             {
                 int count = stream.Read(buffer, 0, (int)Math.Min(buffer.Length, remaining));
@@ -93,6 +96,10 @@ internal sealed class FortniteLogMonitor(string? path = null)
                     }
                 }
             }
+            // Do not expose an old sleep/result state while replay is still
+            // catching up to a later wake or map transition in the same file.
+            CatchingUp = position < observedLength;
+            if (CatchingUp) return;
             Latest = progress?.Latest;
             Playtime = progress?.Playtime;
             ResultAvailableAt = progress?.ResultAvailableAt;

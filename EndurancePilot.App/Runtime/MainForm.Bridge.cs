@@ -199,7 +199,9 @@ public sealed partial class MainForm
                 if (SleepSignal is not null)
                 {
                     heading = "Fortnite needs Keep Playing";
-                    detail = automaticTransitionFocus ? "Keep Playing is queued; Pilot will focus Fortnite once and verify the button."
+                    detail = automaticTransitionFocus ? transitionWaitingForInput
+                        ? "Keep Playing is queued. Waiting for keys and mouse buttons to be released before taking focus."
+                        : "Keep Playing is queued; Pilot will focus Fortnite once and verify the button."
                         : "Keep Playing detected. Return to Fortnite to wake it, or enable automatic wake and next-run focus in Settings.";
                 }
                 else if (gameLog.ResultAvailableAt >= runner.StartedAt)
@@ -210,6 +212,7 @@ public sealed partial class MainForm
                         : "Return to Fortnite to collect rewards and continue the next run.";
                 }
                 if (transitionError is not null) detail = transitionError;
+                else if (gameLog.CatchingUp) detail = "Reading recent Fortnite log events before game controls resume.";
             }
             else if (interactionPause.Active)
             {

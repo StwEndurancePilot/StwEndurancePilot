@@ -13,8 +13,14 @@ static class Program
         {
             var monitor = new FortniteLogMonitor();
             monitor.Poll(DateTimeOffset.UtcNow);
+            var deadline = System.Diagnostics.Stopwatch.StartNew();
+            while (monitor.CatchingUp && deadline.Elapsed < TimeSpan.FromSeconds(10))
+            {
+                Thread.Sleep(100);
+                monitor.Poll(DateTimeOffset.UtcNow);
+            }
             File.WriteAllText(args[1], System.Text.Json.JsonSerializer.Serialize(new
-                { monitor.Latest, monitor.Playtime, monitor.ResultAvailableAt }, Inspection.Json));
+                { monitor.Latest, monitor.Playtime, monitor.ResultAvailableAt, monitor.CatchingUp }, Inspection.Json));
             return;
         }
         if (args.Length == 2 && args[0] == "--analyze-current-screen")

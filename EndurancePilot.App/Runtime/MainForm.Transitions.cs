@@ -9,6 +9,7 @@ public sealed partial class MainForm
     private nint transitionPreviousWindow, transitionGameWindow;
     private DateTimeOffset? screenSleepSince;
     private string? transitionError;
+    private bool transitionWaitingForInput;
 
     private GameLogPlaytime? SleepSignal => gameLog.Playtime is { NeedsKeepPlaying: true } sleeping ? sleeping
         : screenSleepSince is { } seen && (gameLog.Playtime is null || gameLog.Playtime.ChangedAt < seen)
@@ -18,6 +19,8 @@ public sealed partial class MainForm
     {
         var now = DateTimeOffset.UtcNow;
         var game = GameWindow.Find();
+        bool held = InputIsHeld();
+        transitionWaitingForInput = held;
         if (game?.IsForeground == true) transitionError = null;
         if (transitionFocus.Active is not null)
         {
@@ -37,12 +40,13 @@ public sealed partial class MainForm
             }
             return false;
         }
+        if (gameLog.CatchingUp) return false;
         int endedIncludingCurrent = runSession.AttemptsEnded + (tracker.Current is { Outcome: RunOutcome.InProgress } ? 1 : 0);
         bool canRepeat = runnerMode && runSession.Phase == SessionPhase.Running
             && (runSession.AttemptLimit is null || endedIncludingCurrent < runSession.AttemptLimit);
         var request = transitionFocus.Request(automaticTransitionFocus, runner.IsRunning, runner.ControlsPaused,
             controller.Status is ControllerStatus.Stopped or ControllerStatus.PausedForAttention, game?.IsForeground == true,
-            canRepeat, runner.StartedAt ?? now, SleepSignal, gameLog.ResultAvailableAt, now, InputIsHeld());
+            canRepeat, runner.StartedAt ?? now, SleepSignal, gameLog.ResultAvailableAt, now, held);
         if (request is null) return false;
         transitionError = null;
         int capturedSession = session, generation = runner.InputGeneration;

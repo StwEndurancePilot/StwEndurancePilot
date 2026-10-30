@@ -40,6 +40,15 @@ internal static class FortniteLogChecks
             Check("oversized unrelated lines do not poison later records", reader.Latest?.Wave == 3);
             reader.Reset();
             Check("Stop clears the log snapshot", reader.Latest is null);
+            File.WriteAllText(path, $"[{epoch.AddSeconds(1):yyyy.MM.dd-HH.mm.ss:fff}][123]LogFortPlaytimeManager: [394e] Changing Playtime State from Idle to Sleep\n"
+                + string.Concat(Enumerable.Repeat("Unrelated diagnostic line\n", 140000))
+                + $"[{epoch.AddSeconds(8):yyyy.MM.dd-HH.mm.ss:fff}][123]LogFortPlaytimeManager: [394e] Changing Playtime State from Sleep to Unblocked\n"
+                + Wave(9, 4) + "\n");
+            reader.Poll(3, epoch, now);
+            Check("Partial startup replay does not expose an obsolete sleep state", reader.CatchingUp && reader.Playtime is null && reader.Latest is null);
+            reader.Poll(3, epoch, now);
+            Check("A long log recovers the latest wave and wake state together", !reader.CatchingUp
+                && reader.Latest?.Wave == 4 && reader.Playtime is { NeedsKeepPlaying: false });
         }
         finally { if (File.Exists(path)) File.Delete(path); }
         return checks;
