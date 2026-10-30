@@ -22,17 +22,8 @@ internal static class HestiaEntryScenarios
         pause.Clear();
         check("Stop clears temporary pause", !pause.Active);
         pause.Begin();
-        check("Confirmed background hub begins idle wait", !pause.Ready(epoch, false, false, 0, 0, resumeHub: true));
-        check("Background hub waits ten seconds", !pause.Ready(epoch.AddSeconds(9), false, false, 0, 0, resumeHub: true));
-        check("Confirmed background hub can resume after inactivity", pause.Ready(epoch.AddSeconds(10), false, false, 0, 0, resumeHub: true));
-        pause.Begin();
-        check("OS-confirmed idle resumes without a second countdown", pause.Ready(epoch.AddSeconds(10), false, false, 0, 0,
-            resumeHub: true, backgroundIdleSeconds: 0));
-        pause.Begin();
-        pause.Ready(epoch, false, false, 0, 0, resumeHub: true);
-        check("User activity postpones hub focus recovery", !pause.Ready(epoch.AddSeconds(10), false, true, 0, 0, resumeHub: true));
-        pause.Ready(epoch.AddSeconds(11), false, false, 0, 0, resumeHub: true);
-        check("Losing hub evidence blocks automatic focus recovery", !pause.Ready(epoch.AddSeconds(22), false, false, 0, 0));
+        check("Background idle never authorizes focus recovery", !pause.Ready(epoch, false, false, 0, 0)
+            && !pause.Ready(epoch.AddDays(1), false, false, 0, 0) && pause.Active);
         pause.Clear();
         var recognizer = new ScreenRecognizer();
         Observation Frame(double t, params string[] labels) => new(epoch.AddSeconds(t), 1920, 1080,

@@ -2,7 +2,7 @@ using EndurancePilot.Core;
 
 namespace EndurancePilot.App;
 
-internal sealed record PilotSnapshot(bool Running, bool Attention, string Headline, string Detail, int? Wave,
+internal sealed record PilotSnapshot(bool Running, bool Attention, bool Paused, bool Background, string Headline, string Detail, int? Wave,
     int Completed, string Activity);
 
 public sealed partial class MainForm
@@ -40,7 +40,7 @@ public sealed partial class MainForm
         _ = Handle;
         var (modifiers, key) = RunnerHotkey.Resolve(startStopHotkey);
         stopHotkeyRegistered = RegisterHotKey(Handle, StopHotkeyId, modifiers, key);
-        status.Text = stopHotkeyRegistered ? "Keep Fortnite active and focused while running."
+        status.Text = stopHotkeyRegistered ? "Monitoring continues in the background. Return to Fortnite for game controls."
             : $"The {startStopHotkey} shortcut is unavailable. Choose another shortcut in Settings.";
         FormClosing += (_, e) => { if (!shuttingDown && e.CloseReason == CloseReason.UserClosing) { e.Cancel = true; Hide(); } };
         AddActivity("Early access: full unattended wave-30 repeat is not yet verified. Tiny 25% HUD text is still a known gap.");
@@ -119,14 +119,6 @@ public sealed partial class MainForm
         }
         return stopHotkeyRegistered;
     }
-    internal void SetAutoResume(bool enabled, int idleSeconds)
-    {
-        var next = ReadSettings() with { AutoResumeFortnite = enabled, AutoResumeIdleSeconds = idleSeconds };
-        next.Validate();
-        settingsStore.Save(next);
-        autoResumeFortnite = enabled;
-        autoResumeIdleSeconds = idleSeconds;
-    }
     internal void ApplySettings(RunnerSettings value)
     {
         if (runner.IsRunning)
@@ -186,33 +178,32 @@ public sealed partial class MainForm
     {
         bool attention = controller.Status == ControllerStatus.PausedForAttention || !stopHotkeyRegistered;
         string heading = attention ? "Needs attention" : runner.IsRunning ? runner.Mode == RunnerMode.Observe ? "Watching Fortnite" : "Runner active" : runner.StartedAt is null ? "" : "Session stopped";
-        string detail = attention || !runner.IsRunning ? status.Text : runner.Mode == RunnerMode.Observe ? "Observing only. No game input is sent." : controller.Detail;
-        if (InputPaused && !attention)
+        string detail = attention ? controller.Status == ControllerStatus.PausedForAttention ? controller.Detail : status.Text
+            : !runner.IsRunning ? status.Text : runner.Mode == RunnerMode.Observe ? "Observing only. No game input is sent." : controller.Detail;
+        bool background = runner.IsRunning && GameWindow.Find()?.IsForeground != true;
+        if (!attention && runner.IsRunning)
         {
-            heading = "Paused for your input";
-            detail = autoResumeFortnite
-                ? $"Focusing Fortnite after {autoResumeIdleSeconds} seconds without keyboard or mouse input, or click Resume."
-                : "Focus Fortnite and leave input idle for 2 seconds, or click Resume.";
-        }
-        if (runner.IsRunning && status.Text.StartsWith("Observation paused"))
-        {
-            detail = "Waiting for Fortnite. Bring the game to the foreground to continue.";
-        }
-
-        if (runner.IsRunning && status.Text.StartsWith("Waiting for Fortnite"))
-        {
-            detail = status.Text;
-        }
-
-        if (runner.IsRunning && launcher.Status == LaunchStatus.NeedsAttention)
-        {
-            detail = launcher.Detail;
+            if (InputPaused)
+            {
+                heading = "Paused";
+                detail = "Monitoring continues when capture is available. Resume to allow game controls; Stop ends the session. The mission keeps running.";
+            }
+            else if (background)
+            {
+                heading = "Monitoring in background";
+                detail = status.Text.StartsWith("Waiting for a") || status.Text.StartsWith("Background capture")
+                    ? status.Text : "Return to Fortnite to resume game controls. Pilot will not focus or restore the game.";
+            }
+            else if (interactionPause.Active)
+            {
+                detail = "Waiting for released input and a fresh screen. Use Pause to take control of Fortnite.";
+            }
         }
 
         var current = tracker.Current;
         int? activeWave = runner.IsRunning && current is { Outcome: RunOutcome.InProgress, EndedAt: null }
             ? current.HighestWave : null;
-        return new(runner.IsRunning, attention, heading, detail, activeWave, runSession.CompletedRuns,
+        return new(runner.IsRunning, attention, InputPaused, background, heading, detail, activeWave, runSession.CompletedRuns,
             string.Join(Environment.NewLine, activity.Items.Cast<string>().Reverse().Take(80)));
     }
     internal void ShowTechnicalDetails()

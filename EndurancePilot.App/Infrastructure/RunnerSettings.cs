@@ -8,7 +8,8 @@ internal sealed record RunnerSettings(HomebaseZone Zone = HomebaseZone.TwinePeak
     bool LaunchIfMissing = true, bool RunIndefinitely = true,
     bool ManualThemeEnabled = false, bool ManualDarkTheme = true, int TargetWave = 30,
     WebhookSettings? Webhook = null, bool EndRunWhenTargetReached = true, bool WaitForAssistance = false,
-    bool AutoResumeFortnite = true, int AutoResumeIdleSeconds = 10,
+    // Legacy values are preserved for compatibility; they never authorize refocusing.
+    bool AutoResumeFortnite = false, int AutoResumeIdleSeconds = 10,
     string StartStopHotkey = RunnerHotkey.Default, bool CloseToTray = true, bool StartWithWindows = false, bool AutoImportPenny = true)
 {
     public void Validate()

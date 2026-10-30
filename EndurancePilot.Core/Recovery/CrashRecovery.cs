@@ -62,6 +62,19 @@ public sealed class CrashRecovery
         proposed = null;
     }
 
+    public void InvalidateObservation()
+    {
+        candidate = null;
+        proposed = null;
+        hits = 0;
+        dispatchedAt = nextAttemptAt = default;
+        if (Status is CrashRecoveryStatus.Confirming or CrashRecoveryStatus.AwaitingExit)
+        {
+            Status = CrashRecoveryStatus.Monitoring;
+            Detail = "Waiting for fresh crash evidence";
+        }
+    }
+
     public CrashDismissRequest? Observe(CrashSnapshot frame)
     {
         if (Status is CrashRecoveryStatus.Stopped or CrashRecoveryStatus.NeedsAttention || frame.CapturedAt <= lastObservation)

@@ -17,7 +17,7 @@ internal static class SettingsChecks
             Check("Penny startup import defaults on", store.Load(out warning).AutoImportPenny);
             Check("End at target defaults on", store.Load(out warning).EndRunWhenTargetReached);
             Check("Wait for assistance defaults off", !store.Load(out warning).WaitForAssistance);
-            Check("Auto resume defaults to ten idle seconds", store.Load(out warning) is { AutoResumeFortnite: true, AutoResumeIdleSeconds: 10 });
+            Check("New settings disable legacy automatic refocus", store.Load(out warning) is { AutoResumeFortnite: false, AutoResumeIdleSeconds: 10 });
             Check("Existing shortcut defaults to F10", store.Load(out warning).StartStopHotkey == "F10"
                 && RunnerHotkey.Resolve("F10") is (0x4000u, 0x79u));
             Check("Modified shortcut maps to Ctrl+Alt+F9", RunnerHotkey.Resolve("Ctrl+Alt+F9") is (0x4003u, 0x78u));
@@ -67,7 +67,7 @@ internal static class SettingsChecks
             Check("Wait for assistance survives restart", new SettingsStore(path).Load(out warning) == saved && warning is null);
             saved = saved with { AutoResumeFortnite = false, AutoResumeIdleSeconds = 23 };
             store.Save(saved);
-            Check("Auto resume toggle and delay survive restart", new SettingsStore(path).Load(out warning) == saved && warning is null);
+            Check("Legacy focus settings survive restart for compatibility", new SettingsStore(path).Load(out warning) == saved && warning is null);
             saved = saved with { StartStopHotkey = "Ctrl+Alt+F8" };
             store.Save(saved);
             Check("Custom start/stop shortcut survives restart", new SettingsStore(path).Load(out warning) == saved && warning is null);
@@ -76,8 +76,8 @@ internal static class SettingsChecks
             try
             {
                 Check("New app host restores all saved runner preferences", host.ReadSettings() == saved with { Webhook = new WebhookSettings() });
-                host.SetAutoResume(true, 17);
-                Check("Auto resume changes without restarting the host", host.ReadSettings() is { AutoResumeFortnite: true, AutoResumeIdleSeconds: 17 }
+                host.ApplySettings(host.ReadSettings() with { AutoResumeFortnite = true, AutoResumeIdleSeconds = 17 });
+                Check("Legacy focus values remain round-trippable without a focus control", host.ReadSettings() is { AutoResumeFortnite: true, AutoResumeIdleSeconds: 17 }
                     && store.Load(out warning).AutoResumeIdleSeconds == 17);
                 var firstSetup = new WebhookSettings(Enabled: true);
                 host.ApplyWebhook(firstSetup);
@@ -129,7 +129,7 @@ internal static class SettingsChecks
             Check("Existing settings default to target wave 30", legacy.TargetWave == 30);
             Check("Existing settings retain automatic target exit", legacy.EndRunWhenTargetReached);
             Check("Existing settings retain solo Endurance", !legacy.WaitForAssistance);
-            Check("Existing settings receive the auto resume defaults", legacy is { AutoResumeFortnite: true, AutoResumeIdleSeconds: 10 });
+            Check("Older settings without focus values disable legacy automatic refocus", legacy is { AutoResumeFortnite: false, AutoResumeIdleSeconds: 10 });
             Check("Existing settings retain F10 as the shortcut", legacy.StartStopHotkey == "F10");
             File.WriteAllText(path, "{\"Zone\":\"TwinePeaks\",\"AttemptLimit\":2,\"AfkBaseReady\":false,\"LaunchIfMissing\":true}");
             Check("Removed AFK preference does not invalidate existing settings", store.Load(out warning) == legacy && warning is null);

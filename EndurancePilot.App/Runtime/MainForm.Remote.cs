@@ -39,13 +39,13 @@ public sealed partial class MainForm
             token.ThrowIfCancellationRequested();
             snapshot = Snapshot();
             var now = DateTimeOffset.UtcNow;
-            if (game is null) wave = "Fortnite is not open";
+            if (game is null) wave = "Fortnite is closed, minimized or unavailable";
             else if (wave == "Not visible" && tracker.Current is { Outcome: RunOutcome.InProgress } current
                 && now - tracker.LastConfirmedWaveAt < TimeSpan.FromMinutes(3))
                 wave = $"Last confirmed: {current.HighestWave} / 30 ({Math.Max(0, (int)(now - tracker.LastConfirmedWaveAt).TotalSeconds)}s ago)";
             var elapsed = runner.StartedAt is { } started ? (stoppedAt ?? now) - started : TimeSpan.Zero;
             string account = EpicLauncher.ProgressAccount;
-            string text = $"Account: {account}\nStatus: {(snapshot.Attention ? "Error · runner paused" : snapshot.Running ? "Running" : "Stopped")}\nWave: {wave}\nSession time: {(int)Math.Max(0, elapsed.TotalHours)}h {elapsed.Minutes:D2}m {elapsed.Seconds:D2}s\nCompleted runs: {snapshot.Completed}";
+            string text = $"Account: {account}\nStatus: {(snapshot.Attention ? "Error · runner paused" : snapshot.Paused ? "Paused · monitoring only" : snapshot.Background ? "Monitoring in background" : snapshot.Running ? "Running" : "Stopped")}\nWave: {wave}\nSession time: {(int)Math.Max(0, elapsed.TotalHours)}h {elapsed.Minutes:D2}m {elapsed.Seconds:D2}s\nCompleted runs: {snapshot.Completed}";
             if (snapshot.Attention) text += "\nError: Pilot needs a local check. Open the app for the error details.";
             return new(text);
         }

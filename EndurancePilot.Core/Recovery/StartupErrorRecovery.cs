@@ -9,6 +9,8 @@ public sealed class StartupErrorRecovery
     private readonly Queue<DateTimeOffset> restarts = new();
     public bool Exhausted { get; private set; }
 
+    public void InvalidateObservation() => hits = 0;
+
     public static bool Matches(Observation frame)
     {
         // Require the complete, specific startup error and its dialog controls.

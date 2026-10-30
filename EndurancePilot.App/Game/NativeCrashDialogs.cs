@@ -104,11 +104,6 @@ internal static class NativeCrashDialogs
         }
 
         nint window = (nint)request.Dialog.WindowId, button = (nint)request.Dialog.ButtonId;
-        if (GetForegroundWindow() != window)
-        {
-            SetForegroundWindow(window);
-        }
-
         if (GetForegroundWindow() != window || !sessionIsCurrent()
             || DateTimeOffset.UtcNow - request.ObservedAt > TimeSpan.FromSeconds(5))
         {
@@ -143,5 +138,4 @@ internal static class NativeCrashDialogs
     [DllImport("user32.dll")] private static extern bool IsWindowVisible(nint window);
     [DllImport("user32.dll")] private static extern bool IsWindowEnabled(nint window);
     [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
-    [DllImport("user32.dll")] private static extern bool SetForegroundWindow(nint window);
 }

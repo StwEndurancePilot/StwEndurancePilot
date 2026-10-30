@@ -9,12 +9,16 @@ Endurance Pilot is a Windows app for running Fortnite **Save the World Storm Shi
 ## Getting started
 
 1. Install the latest Windows setup from [Releases](https://github.com/StwEndurancePilot/StwEndurancePilot/releases). The installer checks for the .NET 10 Windows Desktop Runtime.
-2. Open the rounded **Epic account** switcher at the top and choose **Add account** to sign in on Epic's website. The switcher also lets you swap accounts, launch Fortnite, or open **Manage accounts** in the main window. You can add an authorization code, exchange code, or device auth credentials there too. Without a saved account, **Launch and restart Fortnite** uses the Epic Games Launcher as before.
+2. Open the rounded **Epic account** switcher at the top and choose **Add account** to sign in on Epic's website. The switcher also lets you swap accounts, launch Fortnite, or open **Manage accounts** in the main window. You can add an authorization code, exchange code, or device auth credentials there too. Without a saved account, **Launch Fortnite on Start** uses the Epic Games Launcher as before.
 3. Choose your **Homebase**. In **Settings**, set the target wave, whether to repeat indefinitely or stop after a chosen number of attempts, and whether to wait for assistance.
-4. Select **Start endurance** or press the start/stop hotkey (F10 by default). Keep Fortnite focused while the runner is active. If you take control, use **Resume in Fortnite** when prompted.
+4. Select **Start endurance** or press the start/stop hotkey (F10 by default). Pilot sends game controls only while Fortnite is foreground. Use **Pause** before taking control of the game, then **Resume** when ready. Pause preserves the session and keeps monitoring; it does not pause the mission.
 5. Watch wave progress and review rewards under **This session**, **Latest mission**, or **Lifetime earnings**. Select **Stop runner** to end the session.
 
-Settings also include an idle delay for refocusing Fortnite, a configurable hotkey, and optional Discord webhook notifications.
+Switching to another app keeps wave, result and reward monitoring active when Fortnite window capture is available. Pilot does not steal focus or restore a minimized game. Return to Fortnite to resume controls after fresh screen validation, unless you manually paused. Mouse movement can interrupt a click safely, but does not create a persistent pause. **Stop runner** (or F10) ends the Pilot session and leaves Fortnite open.
+
+**Launch Fortnite on Start** permits an initial launch. If Fortnite exits, open it yourself or Stop and Start to request another launch; background monitoring never relaunches it. Legacy idle-refocus settings are retained in saved files for compatibility but are ignored. Settings also include a configurable start/stop hotkey and optional Discord webhook notifications.
+
+The Twine Peaks route prefers a reliable detected homebase icon and an unambiguous SELECT control, then verifies My Storm Shield before launch. Full unattended wave-30 repetition and arbitrary roaming are not verified.
 
 ### Updating without losing preferences
 

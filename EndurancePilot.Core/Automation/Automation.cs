@@ -284,6 +284,23 @@ public sealed class AutomationController
         homebaseHeadingMissingSince = null;
     }
 
+    public void ReacquireInput()
+    {
+        InvalidateObservation();
+        questEntry.Reset();
+        Pending = suspendedPending = null;
+        attempts = suspendedAttempts = 0;
+        dispatchedAt = nextActionAt = default;
+        if (Status == ControllerStatus.AwaitingTransition)
+        {
+            Status = ControllerStatus.Observing;
+        }
+        if (Status == ControllerStatus.Observing)
+        {
+            Detail = "Waiting for fresh screen evidence before acting";
+        }
+    }
+
     public ClickAction? Observe(Observation frame, ScreenEvidence evidence)
     {
         if (Status is ControllerStatus.Stopped or ControllerStatus.PausedForAttention)

@@ -43,12 +43,10 @@ public partial class PilotWindow
                 if (remoteLogin is not null) return new("Finish account sign-in before starting.");
                 if (host.Snapshot().Running) return new("Runner is already running.");
                 AccountPopup.IsOpen = false;
-                if (GameWindow.Find() is { } startGame && !await GameInput.FocusForAutomationAsync(startGame, token))
-                    return new("Runner could not start because Windows did not let Pilot focus Fortnite. Unlock your PC, release any held keys and try /start again.");
                 token.ThrowIfCancellationRequested();
                 if (remoteLogin is not null) return new("Finish account sign-in before starting.");
                 if (!host.Snapshot().Running) ToggleFromControls();
-                return new(host.Snapshot().Running ? "Runner started using saved settings." : "Runner could not start. Check Pilot on your PC.");
+                return new(host.Snapshot().Running ? "Runner started using saved settings. Return to Fortnite to allow game controls." : "Runner could not start. Check Pilot on your PC.");
             case "stop":
                 if (host.Snapshot().Running) host.ToggleRunner();
                 return new("Runner stopped.");

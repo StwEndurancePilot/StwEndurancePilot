@@ -50,6 +50,7 @@ internal static class EpicLauncher
             throw new InvalidOperationException("Fortnite is already running or starting. No second launch was sent.");
         }
 
+        token.ThrowIfCancellationRequested();
         var account = Accounts.Selected;
         if (account is null)
         {
@@ -63,6 +64,7 @@ internal static class EpicLauncher
         string code = await auth.LaunchExchangeCodeAsync(account, token);
         if (Inspect() is { GamePresent: true } or { BootstrapperPresent: true })
             throw new InvalidOperationException("Fortnite started while the account was being authenticated. No second launch was sent.");
+        token.ThrowIfCancellationRequested();
         string[] args = ["-AUTH_LOGIN=unused", $"-AUTH_PASSWORD={code}", "-AUTH_TYPE=exchangecode",
             "-epicapp=Fortnite", "-epicenv=Prod", "-EpicPortal",
             $"-epicusername={account.DisplayName}", $"-epicuserid={account.AccountId}"];
@@ -75,7 +77,7 @@ internal static class EpicLauncher
         finally { LaunchGate.Release(); }
     }
 
-    internal static async Task StopGameAsync(CancellationToken token)
+    internal static async Task StopGameAsync(CancellationToken token, Func<bool>? canContinue = null)
     {
         await LaunchGate.WaitAsync(token);
         try
@@ -92,6 +94,8 @@ internal static class EpicLauncher
                     using (process)
                     {
                         token.ThrowIfCancellationRequested();
+                        if (canContinue?.Invoke() == false)
+                            throw new GameObservationChangedException("Startup recovery stopped because game controls are unavailable.");
                         try
                         {
                             if (process.HasExited || process.SessionId != session) continue;

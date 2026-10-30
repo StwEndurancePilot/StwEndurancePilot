@@ -205,8 +205,7 @@ public static class NavigationPlanner
                         return new(null, "Waiting to re-read the confirmed homebase heading");
                     }
 
-                    return new(new(NavigationStep.SelectHomebase, "Select the homebase icon",
-                        MenuGeometry.Target(NavigationStep.SelectHomebase, frame)), "Select homebase");
+                    return SelectHomebase(frame);
                 }
                 if (!frame.Has("^" + ZoneName(profile.Zone).ToUpperInvariant() + "$")
                     && !HomebaseHeadings(frame).Any(r => r.Normalized.StartsWith(ZoneName(profile.Zone).ToUpperInvariant() + " STORM ", StringComparison.Ordinal)))
@@ -221,12 +220,14 @@ public static class NavigationPlanner
 
                 if (!homebaseClickConfirmed)
                 {
-                    return new(new(NavigationStep.SelectHomebase, "Click the homebase icon",
-                        MenuGeometry.Target(NavigationStep.SelectHomebase, frame)), "Select homebase");
+                    return SelectHomebase(frame);
                 }
 
-                return new(new(NavigationStep.OpenHomebase, "Open the selected homebase",
-                    MenuGeometry.Target(NavigationStep.OpenHomebase, frame)), "Open homebase");
+                var selectLabels = frame.Find(@"^SELECT$").ToArray();
+                var selectTarget = selectLabels.Length > 0 ? AutomationController.UniqueTarget(selectLabels) : ReliableVisual(frame, "select-control");
+                return selectTarget is { } select && AutomationController.IsValidTarget(select, frame.Width, frame.Height)
+                    ? new(new(NavigationStep.OpenHomebase, "Open the selected homebase", select), "Open homebase")
+                    : new(null, "Waiting for one unambiguous SELECT control");
             case ScreenKind.HomebaseChoice:
                 if (ReliableVisual(frame, "own-homebase-selected") is null)
                 {
@@ -287,6 +288,18 @@ public static class NavigationPlanner
             default:
                 return new(null, "Observing " + screen.Kind);
         }
+    }
+
+    private static NavigationDecision SelectHomebase(Observation frame)
+    {
+        var icons = frame.FindVisual("homebase-icon").ToArray();
+        // Retain the existing layout fallback only when no icon evidence exists.
+        // A weak or conflicting detection must not turn into a blind fixed click.
+        var target = icons.Length == 0 ? MenuGeometry.Target(NavigationStep.SelectHomebase, frame)
+            : ReliableVisual(frame, "homebase-icon");
+        return target is { } box && AutomationController.IsValidTarget(box, frame.Width, frame.Height)
+            ? new(new(NavigationStep.SelectHomebase, "Select the homebase icon", box), "Select homebase")
+            : new(null, "Waiting for one reliable homebase icon");
     }
 
     public static bool HasSelectedHomebase(Observation frame) => HomebaseHeadings(frame).Any();

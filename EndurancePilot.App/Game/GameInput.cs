@@ -8,7 +8,7 @@ internal sealed class TargetChangedException() : InvalidOperationException("Dete
 
 internal static class GameInput
 {
-    // Used for remote Start and foreground recovery while automation is running.
+    // Explicit live diagnostic only. The runner never calls this to regain focus.
     internal static async Task<bool> FocusForAutomationAsync(GameWindow game, CancellationToken cancellation)
     {
         cancellation.ThrowIfCancellationRequested();
@@ -42,6 +42,8 @@ internal static class GameInput
     public static async Task<bool> DispatchAsync(GameWindow game, Bitmap observedImage, ClickAction action,
         OcrService ocr, Func<bool> sessionIsCurrent, CancellationToken cancellation)
     {
+        cancellation.ThrowIfCancellationRequested();
+        if (!sessionIsCurrent()) return false;
         if (action.Step == NavigationStep.SearchSaveTheWorld && !DiscoveryNavigation.IsSearchAction(action))
         {
             throw new InvalidOperationException("Search typing is not allowed on this screen.");
@@ -156,12 +158,12 @@ internal static class GameInput
                 }
             };
             return await KeyPress.SendAsync(
-                () => { if (SendInput(1, [down], Marshal.SizeOf<NativeInput>()) != 1) { throw new InvalidOperationException("Windows did not accept key down. Recovery paused."); } },
+                () => SendRequired([down], "key down for " + action.Step),
                 () =>
                 {
                     if (SendInput(1, [up], Marshal.SizeOf<NativeInput>()) != 1 && SendInput(1, [up], Marshal.SizeOf<NativeInput>()) != 1)
                     {
-                        throw new InvalidOperationException("Windows did not accept key release. Recovery paused.");
+                        throw InputError("key release for " + action.Step, Marshal.GetLastWin32Error(), 0, 1);
                     }
                 },
                 () => sessionIsCurrent() && game.IsForeground, cancellation);
@@ -186,10 +188,10 @@ internal static class GameInput
                 }
             }
         };
-        if (SendInput(1, [move], Marshal.SizeOf<NativeInput>()) != 1)
-        {
-            throw new Win32Exception(Marshal.GetLastWin32Error());
-        }
+        cancellation.ThrowIfCancellationRequested();
+        if (!sessionIsCurrent()) return false;
+        ValidateWindow(game, action);
+        SendRequired([move], "move pointer for " + action.Step);
 
         await Task.Delay(NavigationTiming.HoverSettleMilliseconds(action.Step), cancellation);
         if (!sessionIsCurrent())
@@ -228,6 +230,7 @@ internal static class GameInput
             new() { Data = new() { Mouse = new() { Flags = 0x0004 } } }
         ];
         uint inserted = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<NativeInput>());
+        int clickError = inserted != inputs.Length ? Marshal.GetLastWin32Error() : 0;
         if (inserted == 1)
         {
             SendInput(1, [new() { Data = new() { Mouse = new() { Flags = 0x0004 } } }], Marshal.SizeOf<NativeInput>());
@@ -235,7 +238,7 @@ internal static class GameInput
 
         if (inserted != inputs.Length)
         {
-            throw new InvalidOperationException("Windows did not accept the complete click. Recovery paused.");
+            throw InputError("click for " + action.Step, clickError, inserted, (uint)inputs.Length);
         }
 
         if (action.Step == NavigationStep.SearchSaveTheWorld)
@@ -288,14 +291,26 @@ internal static class GameInput
     private static NativeInput Unicode(char value, uint flags) => new() { Type = 1, Data = new() { Keyboard = new() { Scan = value, Flags = flags } } };
     private static void SendKeyboard(NativeInput[] inputs)
     {
-        if (SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<NativeInput>()) == inputs.Length)
+        uint inserted = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<NativeInput>());
+        if (inserted == inputs.Length)
         {
             return;
         }
 
+        int error = Marshal.GetLastWin32Error();
         var releases = inputs.Where(i => (i.Data.Keyboard.Flags & 2) != 0).ToArray();
         SendInput((uint)releases.Length, releases, Marshal.SizeOf<NativeInput>());
-        throw new InvalidOperationException("Windows rejected search input. Recovery paused.");
+        throw InputError("search keyboard input", error, inserted, (uint)inputs.Length);
+    }
+
+    private static Win32Exception InputError(string operation, int error, uint inserted, uint expected) =>
+        new(error, $"SendInput ({operation}) accepted {inserted}/{expected} events; native error {error}: {new Win32Exception(error).Message}. INPUT size {Marshal.SizeOf<NativeInput>()}, process {(Environment.Is64BitProcess ? "x64" : "x86")}.");
+
+    private static void SendRequired(NativeInput[] inputs, string operation)
+    {
+        uint inserted = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<NativeInput>());
+        if (inserted != inputs.Length)
+            throw InputError(operation, Marshal.GetLastWin32Error(), inserted, (uint)inputs.Length);
     }
 
     private static void ValidateWindow(GameWindow game, ClickAction action)
@@ -360,7 +375,8 @@ internal static class GameInput
                 }
             }
         };
-        return SendInput(1, [move], Marshal.SizeOf<NativeInput>()) == 1;
+        SendRequired([move], "clear pointer after " + action.Step);
+        return true;
     }
 
     internal static bool TargetStillMatches(Bitmap before, Bitmap after, Box target)

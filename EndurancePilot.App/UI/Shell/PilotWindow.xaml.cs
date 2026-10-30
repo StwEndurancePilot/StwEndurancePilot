@@ -120,9 +120,9 @@ public partial class PilotWindow : FluentWindow
         catch (Exception error) { settingsError = error.Message; StatusDetail.Text = error.Message; return false; }
     }
     private void PrimaryClicked(object sender, RoutedEventArgs e) => ToggleFromControls();
-    private void ResumeClicked(object sender, RoutedEventArgs e)
+    private void PauseClicked(object sender, RoutedEventArgs e)
     {
-        host.ResumeInput();
+        host.ToggleInputPause();
         RefreshState();
     }
     private void ToggleFromControls()
@@ -170,7 +170,7 @@ public partial class PilotWindow : FluentWindow
         Headline.Text = s.Headline;
         HeadlineRow.Visibility = string.IsNullOrWhiteSpace(s.Headline) ? Visibility.Collapsed : Visibility.Visible;
         StatusDetail.Text = settingsError ?? s.Detail;
-        StatusDetail.Visibility = settingsError is null ? Visibility.Collapsed : Visibility.Visible;
+        StatusDetail.Visibility = string.IsNullOrWhiteSpace(StatusDetail.Text) ? Visibility.Collapsed : Visibility.Visible;
         StatusDetail.ToolTip = StatusDetail.Text;
         PrimaryButton.ToolTip = StatusDetail.Text;
         WaveNumber.Text = (s.Wave ?? 0).ToString("00");
@@ -186,10 +186,9 @@ public partial class PilotWindow : FluentWindow
         }
         System.Windows.Automation.AutomationProperties.SetName(WaveNumber, s.Wave is null ? "No wave detected" : $"Highest confirmed wave {s.Wave}; target {targetWave}");
         PrimaryText.Text = s.Running ? "Stop runner" : "Start endurance";
-        var resume = host.ResumePrompt();
-        ResumeButton.Content = resume.Label;
-        ResumeButton.Visibility = resume.Visible && !s.Attention ? Visibility.Visible : Visibility.Collapsed;
-        System.Windows.Automation.AutomationProperties.SetName(ResumeButton, resume.Label);
+        PauseButton.Content = s.Paused ? "Resume" : "Pause";
+        PauseButton.Visibility = s.Running && !s.Attention ? Visibility.Visible : Visibility.Collapsed;
+        System.Windows.Automation.AutomationProperties.SetName(PauseButton, s.Paused ? "Resume game controls" : "Pause game controls");
         string hotkey = host.ReadSettings().StartStopHotkey;
         ShortcutText.Text = s.Running ? $"{hotkey} to stop" : $"{hotkey} to start";
         PrimaryIcon.Symbol = s.Running ? SymbolRegular.Stop24 : SymbolRegular.Play24;
@@ -209,7 +208,7 @@ public partial class PilotWindow : FluentWindow
             activityText.Text = s.Activity;
         }
 
-        var layout = $"{EarningsView.SelectedIndex}:{items.Count}:{ResumeButton.Visibility}";
+        var layout = $"{EarningsView.SelectedIndex}:{items.Count}:{PauseButton.Visibility}:{StatusDetail.Text}";
         if (rewardLayout != layout && settingsPane is null && accountsPane is null)
         {
             rewardLayout = layout;
@@ -526,15 +525,6 @@ public partial class PilotWindow : FluentWindow
                 {
                     WaitForAssistance = waitForAssistance
                 });
-                return null;
-            }
-            catch (Exception error) { return error.Message; }
-        }, (enabled, seconds) =>
-        {
-            try
-            {
-                host.SetAutoResume(enabled, seconds);
-                RefreshState();
                 return null;
             }
             catch (Exception error) { return error.Message; }

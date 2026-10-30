@@ -8,17 +8,6 @@ internal sealed class GameObservationChangedException(string message) : InvalidO
 public sealed record GameWindow(nint Handle, int ProcessId, Rectangle ClientBounds)
 {
     private const string ProcessName = "FortniteClient-Win64-Shipping";
-    internal static void RestoreForAutomation()
-    {
-        var processes = Process.GetProcessesByName(ProcessName);
-        try
-        {
-            if (processes.Length != 1) return;
-            var handle = processes[0].MainWindowHandle;
-            if (handle != 0 && IsIconic(handle)) ShowWindowAsync(handle, 9);
-        }
-        finally { foreach (var process in processes) process.Dispose(); }
-    }
     public static GameWindow? Find()
     {
         var candidates = new List<GameWindow>();
@@ -82,6 +71,12 @@ public sealed record GameWindow(nint Handle, int ProcessId, Rectangle ClientBoun
 
             return image;
         }
+        catch (System.ComponentModel.Win32Exception error)
+        {
+            image.Dispose();
+            throw new System.ComponentModel.Win32Exception(error.NativeErrorCode,
+                $"Fortnite screen capture (CopyFromScreen) failed; native error {error.NativeErrorCode}: {error.Message}");
+        }
         catch { image.Dispose(); throw; }
     }
 
@@ -101,5 +96,4 @@ public sealed record GameWindow(nint Handle, int ProcessId, Rectangle ClientBoun
     [DllImport("user32.dll")] private static extern bool IsIconic(nint hwnd);
     [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
     [DllImport("user32.dll")] private static extern bool SetForegroundWindow(nint hwnd);
-    [DllImport("user32.dll")] private static extern bool ShowWindowAsync(nint hwnd, int command);
 }

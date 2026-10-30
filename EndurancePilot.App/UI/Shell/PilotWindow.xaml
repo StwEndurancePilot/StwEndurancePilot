@@ -136,8 +136,8 @@
       </ScrollViewer>
       <Border x:Name="RunControls" Grid.Row="1" Padding="28,16,28,18" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource PilotBorder}" Background="{DynamicResource PilotBackground}">
         <StackPanel>
-          <TextBlock x:Name="StatusDetail" Visibility="Collapsed" />
-          <ui:Button x:Name="ResumeButton" Content="Resume in Fortnite" Visibility="Collapsed" HorizontalAlignment="Stretch" Height="38" Margin="0,0,0,8" Click="ResumeClicked" AutomationProperties.Name="Resume in Fortnite" />
+          <TextBlock x:Name="StatusDetail" Visibility="Collapsed" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,10" Foreground="{DynamicResource PilotSecondary}" />
+          <ui:Button x:Name="PauseButton" Content="Pause" Visibility="Collapsed" HorizontalAlignment="Stretch" Height="38" Margin="0,0,0,8" Click="PauseClicked" AutomationProperties.Name="Pause game controls" />
           <ui:Button x:Name="PrimaryButton" Appearance="Primary" CornerRadius="10" Height="54" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Click="PrimaryClicked" AutomationProperties.Name="Start endurance">
             <Grid Margin="6,0">
               <Grid.ColumnDefinitions>

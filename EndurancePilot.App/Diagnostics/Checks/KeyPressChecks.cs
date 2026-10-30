@@ -46,6 +46,22 @@ internal static class KeyPressChecks
         sent = await KeyPress.SendAsync(() => events.Add("down"), () => events.Add("up"), () => focused, CancellationToken.None,
             (_, _) => { focused = false; return Task.CompletedTask; });
         Check("Focus lost during hold still releases without acknowledging success", !sent && events.SequenceEqual(new[] { "down", "up" }));
+        foreach (bool stop in new[] { false, true })
+        {
+            var runner = new EndurancePilot.Core.RunnerSession();
+            runner.Start(EndurancePilot.Core.RunnerMode.Runner, new(EndurancePilot.Core.HomebaseZone.TwinePeaks, true), 1, DateTimeOffset.UtcNow);
+            int generation = runner.InputGeneration;
+            events.Clear();
+            sent = await KeyPress.SendAsync(() => events.Add("down"), () => events.Add("up"),
+                () => runner.CanControl(generation), CancellationToken.None, (_, _) =>
+                {
+                    if (stop) runner.Stop("Stop during hold");
+                    else { runner.PauseControls(); runner.ResumeControls(); }
+                    return Task.CompletedTask;
+                });
+            Check($"{(stop ? "Stop" : "Pause and immediate Resume")} during hold releases without reviving old input",
+                !sent && events.SequenceEqual(new[] { "down", "up" }));
+        }
         return checks;
     }
 }

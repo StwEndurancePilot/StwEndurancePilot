@@ -8,6 +8,41 @@ public sealed record SessionUpdate(ClickAction? Action, RunRecord? Outcome, bool
 
 public sealed class RunnerSession
 {
+    public bool ControlsPaused { get; private set; }
+    public int InputGeneration { get; private set; }
+    public bool CanControl(int generation) => IsRunning && !ControlsPaused && Mode != RunnerMode.Observe
+        && generation == InputGeneration && Controller.Status is ControllerStatus.Observing or ControllerStatus.AwaitingTransition;
+
+    public void PauseControls()
+    {
+        if (!IsRunning || ControlsPaused) return;
+        ControlsPaused = true;
+        ReacquireInput();
+    }
+
+    public void ResumeControls()
+    {
+        if (!IsRunning || !ControlsPaused) return;
+        ControlsPaused = false;
+        ReacquireInput();
+    }
+
+    // Invalidates both proposed input and asynchronous acknowledgements. Run and
+    // reward progress survive; old transition deadlines must not survive an absence.
+    public void ReacquireInput()
+    {
+        InputGeneration++;
+        Controller.ReacquireInput();
+    }
+
+    public bool TryDispatched(ClickAction action, DateTimeOffset now, int generation)
+    {
+        if (!CanControl(generation)) return false;
+        Controller.Dispatched(action, now);
+        Rewards.Dispatched(action);
+        return true;
+    }
+
     public RunTracker Tracker { get; } = new();
     public MissionRewardTracker Rewards { get; } = new();
     public AutomationController Controller { get; } = new();
@@ -44,6 +79,8 @@ public sealed class RunnerSession
         Progress = progress;
         StartedAt = now;
         IsRunning = true;
+        ControlsPaused = false;
+        InputGeneration++;
         Controller.Profile = profile;
         Controller.ErrorRecoveryOnly = mode != RunnerMode.Runner;
         Controller.ClaimRewards = mode != RunnerMode.Observe;
@@ -56,6 +93,7 @@ public sealed class RunnerSession
 
     public SessionUpdate Observe(Observation frame, ScreenEvidence evidence)
     {
+        if (ControlsPaused) return ObserveBackground(frame, evidence);
         if (!IsRunning)
         {
             return new(null, null, false);
@@ -141,8 +179,20 @@ public sealed class RunnerSession
             return new(null, null, false);
         }
 
-        Controller.InvalidateObservation();
+        ReacquireInput();
         Rewards.Observe(frame, evidence, Tracker.Current);
+        if (Mode == RunnerMode.Runner && evidence.AllowsInput)
+        {
+            // A user may finish collecting rewards while Pilot is paused or in
+            // the background. Stable menu evidence may finish the session, but
+            // must never start another attempt from this observation path.
+            Progress.Observe(frame, evidence, awaitingInputResult: false);
+            if (Progress.Phase == SessionPhase.Complete)
+            {
+                Stop("Attempt limit reached after rewards");
+                return new(null, null, true);
+            }
+        }
         if (!evidence.AllowsInput || evidence.Kind is not (ScreenKind.ActiveEndurance or ScreenKind.EnduranceCountdown or ScreenKind.Victory or ScreenKind.Defeat))
         {
             return new(null, null, false);
@@ -224,6 +274,8 @@ public sealed class RunnerSession
     public void Stop(string reason)
     {
         IsRunning = false;
+        ControlsPaused = false;
+        InputGeneration++;
         Controller.Stop(reason);
     }
 }

@@ -119,20 +119,18 @@
                 <ColumnDefinition Width="Auto" />
               </Grid.ColumnDefinitions>
               <StackPanel Margin="0,0,20,0">
-                <TextBlock Text="Launch and restart Fortnite" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" />
-                <TextBlock Text="Open Fortnite if it is closed and relaunch after a crash." FontSize="12" TextWrapping="Wrap" LineHeight="18" Foreground="{DynamicResource PilotSecondary}" Margin="0,6,0,0" />
+                <TextBlock Text="Launch Fortnite on Start" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" />
+                <TextBlock Text="Start can open Fortnite if it is closed. After a crash, open Fortnite yourself or Stop and Start to request another launch." FontSize="12" TextWrapping="Wrap" LineHeight="18" Foreground="{DynamicResource PilotSecondary}" Margin="0,6,0,0" />
               </StackPanel>
-              <ui:ToggleSwitch x:Name="LaunchToggle" Grid.Column="1" VerticalAlignment="Center" AutomationProperties.Name="Launch and restart Fortnite" />
+              <ui:ToggleSwitch x:Name="LaunchToggle" Grid.Column="1" VerticalAlignment="Center" AutomationProperties.Name="Launch Fortnite on Start" />
             </Grid>
           </StackPanel>
         </Border>
         <TextBlock Text="FOCUS" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PilotSecondary}" Margin="0,24,0,12" />
-        <Border CornerRadius="12" Background="{DynamicResource PilotSurface}" BorderBrush="{DynamicResource PilotBorder}" BorderThickness="1" Padding="18">
+        <Border x:Name="FocusGuidance" CornerRadius="12" Background="{DynamicResource PilotSurface}" BorderBrush="{DynamicResource PilotBorder}" BorderThickness="1" Padding="18">
           <StackPanel>
-            <TextBlock Text="Keep Fortnite in the foreground" FontSize="14" FontWeight="SemiBold" />
-            <TextBlock Text="While the runner is active, Pilot restores and focuses Fortnite automatically before acting. Stop the runner to use other windows freely." FontSize="12" TextWrapping="Wrap" LineHeight="18" Foreground="{DynamicResource PilotSecondary}" Margin="0,6,0,0" />
-            <ui:ToggleSwitch x:Name="FocusWhenIdleToggle" Visibility="Collapsed" />
-            <ui:NumberBox x:Name="FocusIdleSecondsInput" Visibility="Collapsed" Minimum="2" Maximum="600" />
+            <TextBlock Text="Monitor in the background" FontSize="14" FontWeight="SemiBold" />
+            <TextBlock Text="Pilot monitors the Fortnite window when capture is available, without focusing or restoring it. Controls resume when you return to Fortnite. Pause keeps controls off until Resume; Stop ends the session." FontSize="12" TextWrapping="Wrap" LineHeight="18" Foreground="{DynamicResource PilotSecondary}" Margin="0,6,0,0" />
           </StackPanel>
         </Border>
         <TextBlock Text="SHORTCUT" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PilotSecondary}" Margin="0,24,0,12" />

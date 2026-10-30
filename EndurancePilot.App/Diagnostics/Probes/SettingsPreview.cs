@@ -65,7 +65,7 @@ internal static class SettingsPreview
                 bannerEncoder.Save(file);
             }
 
-            var pane = new SettingsPane(new(), _ => null, _ => null, _ => null, _ => null, _ => null, _ => Task.FromResult("Offline preview"), _ => null, _ => null, (_, _) => null, _ => null);
+            var pane = new SettingsPane(new(), _ => null, _ => null, _ => null, _ => null, _ => null, _ => Task.FromResult("Offline preview"), _ => null, _ => null, _ => null);
             pane.SetRunning(false);
             pane.SetWebhookStatus("Notifications are off.");
             pane.Measure(new System.Windows.Size(width, 650));
@@ -81,7 +81,7 @@ internal static class SettingsPreview
             Save("run-options");
             scroll.ScrollToTop();
             pane.UpdateLayout();
-            var focus = (FrameworkElement)pane.FindName("FocusWhenIdleToggle");
+            var focus = (FrameworkElement)pane.FindName("FocusGuidance");
             scroll.ScrollToVerticalOffset(focus.TransformToAncestor(scroll).Transform(new System.Windows.Point()).Y - 90);
             pane.UpdateLayout();
             Save("focus");

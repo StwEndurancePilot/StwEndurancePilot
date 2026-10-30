@@ -9,7 +9,7 @@ public static class MenuGeometry
 
     public static bool UsesFixedTarget(NavigationStep? step) => step is
         NavigationStep.OpenMap or NavigationStep.ChangeZone or NavigationStep.EnterZone
-        or NavigationStep.SelectHomebase or NavigationStep.OpenHomebase or NavigationStep.SelectOwnHomebase
+        or NavigationStep.SelectOwnHomebase
         or NavigationStep.LaunchHomebase or NavigationStep.LaunchLoadedHomebase
         or NavigationStep.SelectStormShieldTab or NavigationStep.SelectEndurance or NavigationStep.SelectStormShieldExpansion;
 

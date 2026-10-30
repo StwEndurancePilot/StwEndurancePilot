@@ -38,7 +38,7 @@ public sealed partial class MainForm : Form
     private SessionProgress runSession => runner.Progress;
     private bool runnerMode => runner.IsRunning && runner.Mode == RunnerMode.Runner;
     private readonly SettingsStore settingsStore;
-    private readonly CheckBox launchIfMissing = new() { Text = "Launch / relaunch Fortnite", AutoSize = true, Checked = true };
+    private readonly CheckBox launchIfMissing = new() { Text = "Launch Fortnite on Start", AutoSize = true, Checked = true };
     private readonly Label progress = new() { Dock = DockStyle.Top, Height = 68, Padding = new Padding(18, 8, 18, 8), Text = "No session started" };
     private readonly Label nextAction = new() { Dock = DockStyle.Top, Height = 38, Padding = new Padding(18, 5, 18, 5), Text = "Ready · choose your base, then Start runner" };
     private readonly List<Button> startButtons = [];
@@ -159,13 +159,18 @@ public sealed partial class MainForm : Form
                 return;
             }
 
+            int cycleSession = session;
+            var cycleToken = inputCancellation.Token;
             var cycleClock = System.Diagnostics.Stopwatch.StartNew();
             try
             {
                 if (runnerMode)
                 {
                     var processes = EpicLauncher.Inspect();
-                    bool watchCrash = launchIfMissing.Checked || (webhook.Enabled && webhook.Events.HasFlag(WebhookEvent.Crash));
+                    var recoveryGame = GameWindow.Find();
+                    int recoveryGeneration = runner.InputGeneration;
+                    bool recoveryAllowed = recoveryGame is not null && ControlsCurrent(session, recoveryGeneration, recoveryGame);
+                    bool watchCrash = recoveryAllowed && (launchIfMissing.Checked || (webhook.Enabled && webhook.Events.HasFlag(WebhookEvent.Crash)));
                     if (watchCrash && (controller.Status != ControllerStatus.PausedForAttention || pausedByException))
                     {
                         int checkingSession = session;
@@ -177,7 +182,8 @@ public sealed partial class MainForm : Form
                             dialogs = await Task.Run(NativeCrashDialogs.Find, closing.Token);
                         }
                         finally { busy = false; }
-                        if (closed || checkingSession != session)
+                        if (closed || checkingSession != session || recoveryGame is null
+                            || !ControlsCurrent(checkingSession, recoveryGeneration, recoveryGame))
                         {
                             return;
                         }
@@ -194,7 +200,7 @@ public sealed partial class MainForm : Form
                         {
                             try
                             {
-                                NativeCrashDialogs.Dismiss(dismiss, () => !closed && checkingSession == session && runnerMode);
+                                NativeCrashDialogs.Dismiss(dismiss, () => ControlsCurrent(checkingSession, recoveryGeneration, recoveryGame));
                                 crashRecovery.Dispatched(dismiss, DateTimeOffset.UtcNow);
                                 notifications.Crash();
                                 controller.Stop("Waiting for crashed Fortnite to exit");
@@ -259,7 +265,7 @@ public sealed partial class MainForm : Form
                     if (processExits.Observe(processes))
                     {
                         notifications.Crash();
-                        bool resume = controller.Status != ControllerStatus.PausedForAttention || pausedByException;
+                        bool resume = !runner.ControlsPaused && (controller.Status != ControllerStatus.PausedForAttention || pausedByException);
                         var interrupted = runner.RecoverAfterProcessExit(processes.CapturedAt, resumeNavigation: resume);
                         if (interrupted is not null)
                         {
@@ -280,23 +286,23 @@ public sealed partial class MainForm : Form
                         {
                             ResumeNavigation = resume
                         });
-                        AddActivity(resume ? "Game exit confirmed · reacquiring the route after relaunch" : "Game exit confirmed · attention pause retained");
+                        AddActivity("Game exit confirmed · open Fortnite yourself, or Stop and Start to request another launch.");
                     }
                     if (controller.Status == ControllerStatus.PausedForAttention)
                     {
                         launcher.Pause(controller.Detail);
                         status.Text = controller.Detail;
-                        return;
                     }
-                    bool launchOnThisObservation = launchSelectedAccountOnStart;
+                    bool launchOnThisObservation = launchSelectedAccountOnStart && !runner.ControlsPaused;
                     launchSelectedAccountOnStart = false;
-                    var request = launcher.Observe(processes, launchOnThisObservation);
-                    if (request is not null && (launchIfMissing.Checked || launchOnThisObservation))
+                    var request = launchOnThisObservation ? launcher.Observe(processes, launchImmediately: true) : null;
+                    if (request is not null && launchOnThisObservation && runner.CanControl(runner.InputGeneration))
                     {
                         launcher.Dispatched(request, DateTimeOffset.UtcNow);
                         busy = true;
-                        try { await EpicLauncher.LaunchAsync(closing.Token); }
+                        try { await EpicLauncher.LaunchAsync(cycleToken); }
                         finally { busy = false; }
+                        if (closed || cycleSession != session || cycleToken.IsCancellationRequested) return;
                         notifications.Launched();
                         log.Write("game-launch", request);
                         AddActivity(EpicLauncher.Accounts.Selected is { } account
@@ -310,20 +316,17 @@ public sealed partial class MainForm : Form
                         return;
                     }
                 }
-                if (runner.IsRunning && runner.Mode != RunnerMode.Observe && controller.Status != ControllerStatus.PausedForAttention)
-                    GameWindow.RestoreForAutomation();
                 var game = GameWindow.Find();
+                if (game?.IsForeground != true || runner.ControlsPaused) InvalidateRecoveryObservation();
                 if (game is null)
                 {
                     backgroundCapture?.Dispose();
                     backgroundCapture = null;
                     notifications.LoseObservation();
-                    controller.InvalidateObservation();
-                    timer.Interval = 250;
-                    status.Text = game is null && runnerMode
-                        ? launchIfMissing.Checked || launcher.Status == LaunchStatus.Starting
-                            ? launcher.Detail : "Waiting for Fortnite · automatic relaunch is off"
-                        : "Observation paused · select Fortnite to resume";
+                    runner.ReacquireInput();
+                    interactionPause.Begin();
+                    timer.Interval = 500;
+                    status.Text = "Waiting for a visible Fortnite window · open or restore it yourself. Stop and Start to request a new launch.";
                     RefreshProgress();
                     return;
                 }
@@ -334,27 +337,9 @@ public sealed partial class MainForm : Form
                         WaitForUserInput("Waiting for Fortnite focus.");
                     }
 
-                    bool resumeUnattended = runner.IsRunning && runner.Mode != RunnerMode.Observe
-                        && controller.Status is ControllerStatus.Observing or ControllerStatus.AwaitingTransition;
-                    controller.InvalidateObservation();
-                    bool focused = false;
-                    if (resumeUnattended)
-                    {
-                        int focusingSession = session;
-                        busy = true;
-                        try { focused = await GameInput.FocusForAutomationAsync(game, closing.Token); }
-                        finally { busy = false; }
-                        if (closed || focusingSession != session) return;
-                    }
-                    if (focused)
-                    {
-                        interactionPause.Clear();
-                        InputPauseChanged?.Invoke();
-                        timer.Interval = 250;
-                        status.Text = "Focusing Fortnite · waiting for fresh screen evidence";
-                        return;
-                    }
-                    timer.Interval = 250;
+                    runner.ReacquireInput();
+                    // Never activate or restore Fortnite from this monitoring loop.
+                    timer.Interval = NavigationTiming.GameplayPollMilliseconds;
                     Bitmap? backgroundFrame = null;
                     int captureSession = session;
                     busy = true;
@@ -401,16 +386,13 @@ public sealed partial class MainForm : Form
                 }
                 backgroundCapture?.Dispose();
                 backgroundCapture = null;
-                if (!InputReady(game))
-                {
-                    return;
-                }
-
+                bool inputReady = InputReady(game);
                 using var frame = game.Capture();
-                await Analyze(frame, game, cycleClock.Elapsed.TotalMilliseconds);
+                await Analyze(frame, game, cycleClock.Elapsed.TotalMilliseconds, observationOnly: !inputReady);
             }
             catch (UserInteractionException error)
             {
+                if (closed || cycleSession != session || cycleToken.IsCancellationRequested) return;
                 WaitForUserInput(error.Message);
                 log.Write("input-paused", new
                 {
@@ -419,7 +401,10 @@ public sealed partial class MainForm : Form
             }
             catch (GameObservationChangedException error)
             {
-                controller.InvalidateObservation();
+                if (closed || cycleSession != session || cycleToken.IsCancellationRequested) return;
+                runner.ReacquireInput();
+                InvalidateRecoveryObservation();
+                interactionPause.Begin();
                 timer.Interval = 250;
                 status.Text = error.Message;
                 log.Write("observation-invalidated", new
@@ -427,10 +412,10 @@ public sealed partial class MainForm : Form
                     error.Message
                 });
             }
-            catch (OperationCanceledException) when (closing.IsCancellationRequested) { }
+            catch (OperationCanceledException) when (closing.IsCancellationRequested || cycleToken.IsCancellationRequested) { }
             catch (Exception error)
             {
-                if (!closed)
+                if (!closed && cycleSession == session && !cycleToken.IsCancellationRequested)
                 {
                     PauseWithError(error);
                 }
@@ -446,6 +431,8 @@ public sealed partial class MainForm : Form
         FormClosed += (_, _) =>
         {
             closed = true;
+            CancelInput();
+            inputCancellation.Dispose();
             session++;
             runner.Stop("App closed");
             launcher.Stop();
@@ -489,6 +476,7 @@ public sealed partial class MainForm : Form
         var chosen = ReadSettings();
         chosen.Validate();
         settingsStore.Save(chosen);
+        CancelInput();
         session++;
         launcher.Stop();
         launchSelectedAccountOnStart = false;
@@ -515,7 +503,7 @@ public sealed partial class MainForm : Form
             RunLimit = runSession.AttemptLimit,
             Bounds = game?.ClientBounds
         });
-        launchSelectedAccountOnStart = navigate && EpicLauncher.Accounts.Selected is not null;
+        launchSelectedAccountOnStart = navigate && (chosen.LaunchIfMissing || EpicLauncher.Accounts.Selected is not null);
         if (navigate && (chosen.LaunchIfMissing || launchSelectedAccountOnStart))
         {
             launcher.Start();
@@ -524,10 +512,7 @@ public sealed partial class MainForm : Form
         SetControlsRunning(true);
         AddActivity($"{runner.Mode} started · {chosen.Zone} · {(chosen.RunIndefinitely ? "indefinite" : $"limit {chosen.AttemptLimit}")}");
         RefreshProgress();
-        if (game is not null && !game.Activate())
-        {
-            status.Text = "Select Fortnite to allow capture.";
-        }
+        status.Text = "Monitoring started · return to Fortnite to allow game controls.";
 
         timer.Interval = NavigationTiming.MenuPollMilliseconds;
         timer.Start();
@@ -535,7 +520,7 @@ public sealed partial class MainForm : Form
 
     private void Stop(string reason)
     {
-        startupErrorRestart?.Cancel();
+        CancelInput();
         interactionPause.Clear();
         Notify(WebhookEvent.RunnerStopped, "Runner stopped", reason + " Stopping the runner does not itself leave an active Fortnite mission.", tracker.Current?.HighestWave);
         notificationSession = false;
@@ -583,6 +568,8 @@ public sealed partial class MainForm : Form
 
         busy = true;
         int capturedSession = session;
+        int capturedGeneration = runner.InputGeneration;
+        var inputToken = inputCancellation.Token;
         try
         {
             status.Text = "Reading text at overview and native resolutions…";
@@ -590,12 +577,12 @@ public sealed partial class MainForm : Form
             var recognitionClock = System.Diagnostics.Stopwatch.StartNew();
             var observation = await ocr.ReadAsync(image, closing.Token, requireExitControls: controller.TargetExitRequested);
             double ocrMilliseconds = recognitionClock.Elapsed.TotalMilliseconds;
-            if (closed || capturedSession != session)
+            if (closed || capturedSession != session || capturedGeneration != runner.InputGeneration)
             {
                 return;
             }
 
-            if (runnerMode && game is not null && controller.Status != ControllerStatus.PausedForAttention)
+            if (!observationOnly && runnerMode && game is not null && ControlsCurrent(capturedSession, capturedGeneration, game))
             {
                 bool restart = startupErrorRecovery.Observe(observation, game.ProcessId);
                 if (StartupErrorRecovery.Matches(observation))
@@ -610,14 +597,14 @@ public sealed partial class MainForm : Form
                     else if (restart && GameWindow.Find() is { } currentGame && currentGame.ProcessId == game.ProcessId)
                     {
                         controller.InvalidateObservation();
-                        status.Text = "Fortnite startup error confirmed · restarting Fortnite";
+                        status.Text = "Fortnite startup error confirmed · closing the failed game; check Epic before starting again";
                         AddActivity(status.Text);
-                        using var recovery = CancellationTokenSource.CreateLinkedTokenSource(closing.Token);
+                        using var recovery = CancellationTokenSource.CreateLinkedTokenSource(closing.Token, inputToken);
                         startupErrorRestart = recovery;
                         try
                         {
-                            await EpicLauncher.StopGameAsync(recovery.Token);
-                            if (closed || capturedSession != session || !runnerMode) return;
+                            await EpicLauncher.StopGameAsync(recovery.Token, () => ControlsCurrent(capturedSession, capturedGeneration, game));
+                            if (closed || capturedSession != session || !runnerMode || inputToken.IsCancellationRequested) return;
                             var outcome = runner.RecoverAfterProcessExit(DateTimeOffset.UtcNow, "Fortnite startup error");
                             if (outcome is not null) RecordOutcome(outcome);
                             if (runSession.Phase == SessionPhase.Complete) { StopAfterSession(); return; }
@@ -626,8 +613,8 @@ public sealed partial class MainForm : Form
                             backgroundCapture?.Dispose(); backgroundCapture = null;
                             if (launcher.Status == LaunchStatus.Stopped) launcher.Start();
                             else launcher.RecoverAfterCrash();
-                            launchSelectedAccountOnStart = true;
-                            log.Write("startup-error-recovery", new { RestartRequested = true });
+                            controller.Pause("Fortnite startup failed. Check Epic, then Stop and Start to request another launch.");
+                            log.Write("startup-error-recovery", new { FailedGameClosed = true, RelaunchRequiresStart = true });
                         }
                         catch (OperationCanceledException) when (recovery.IsCancellationRequested) { }
                         finally { startupErrorRestart = null; }
@@ -639,13 +626,14 @@ public sealed partial class MainForm : Form
             var evidence = recognizer.Recognize(observation);
             bool requireHomebaseIcon = !controller.HomebaseClickConfirmed && controller.Pending?.Step != NavigationStep.SelectHomebase;
             observation = await Task.Run(() => visualRecognizer.Enrich(image, observation, evidence.Kind, requireHomebaseIcon), closing.Token);
-            if (closed || capturedSession != session)
+            if (closed || capturedSession != session || capturedGeneration != runner.InputGeneration)
             {
                 return;
             }
 
             evidence = recognizer.Recognize(observation);
-            observationOnly = game is not null && (observationOnly || !game.IsForeground);
+            observationOnly = game is not null && (observationOnly || !ControlsCurrent(capturedSession, capturedGeneration, game));
+            if (observationOnly) InvalidateRecoveryObservation();
             double recognitionMilliseconds = recognitionClock.Elapsed.TotalMilliseconds;
             bool refreshDiagnostics = game is null || evidence.Kind != lastScreen || DateTimeOffset.UtcNow >= nextDiagnostics;
             if (refreshDiagnostics)
@@ -673,7 +661,7 @@ public sealed partial class MainForm : Form
                 {
 
                     var destination = NavigationPlanner.PostClickPointerDestination(observation, triangle);
-                    if (GameInput.ClearClickedControl(game, triangle, destination, () => !closed && capturedSession == session))
+                    if (GameInput.ClearClickedControl(game, triangle, destination, () => ControlsCurrent(capturedSession, capturedGeneration, game)))
                     {
                         clearedPointerFor = triangle.Id;
                         log.Write("pointer-cleared", new
@@ -781,14 +769,14 @@ public sealed partial class MainForm : Form
                     {
                         var inputClock = System.Diagnostics.Stopwatch.StartNew();
                         if (!await GameInput.DispatchAsync(game, image, action, ocr!,
-                            () => !closed && capturedSession == session, closing.Token))
+                            () => ControlsCurrent(capturedSession, capturedGeneration, game), inputToken))
                         {
                             return;
                         }
 
                         var sentAt = DateTimeOffset.UtcNow;
-                        controller.Dispatched(action, sentAt);
-                        runner.Rewards.Dispatched(action);
+                        if (!ControlsCurrent(capturedSession, capturedGeneration, game)
+                            || !runner.TryDispatched(action, sentAt, capturedGeneration)) return;
                         if (notificationSession && action.SourceScreen is ScreenKind.ErrorDialog or ScreenKind.NeedsAttention)
                         {
                             notifications.Error(tracker.Current?.HighestWave);
@@ -810,7 +798,7 @@ public sealed partial class MainForm : Form
 
                             var destination = NavigationPlanner.PostClickPointerDestination(observation, action);
                             bool moved = GameInput.ClearClickedControl(game, action, destination,
-                                () => !closed && capturedSession == session);
+                                () => ControlsCurrent(capturedSession, capturedGeneration, game));
                             if (moved)
                             {
                                 clearedPointerFor = action.Id;
@@ -826,6 +814,7 @@ public sealed partial class MainForm : Form
                     }
                     catch (TargetChangedException)
                     {
+                        if (!ControlsCurrent(capturedSession, capturedGeneration, game)) return;
                         controller.TargetChanged(action, DateTimeOffset.UtcNow);
                         log.Write("input-rejected", new
                         {
@@ -952,7 +941,10 @@ public sealed partial class MainForm : Form
         log.Write("error", new
         {
             error.Message,
-            Type = error.GetType().Name
+            Type = error.GetType().Name,
+            NativeError = (error as System.ComponentModel.Win32Exception)?.NativeErrorCode,
+            error.StackTrace,
+            InnerError = error.InnerException?.Message
         });
     }
 
