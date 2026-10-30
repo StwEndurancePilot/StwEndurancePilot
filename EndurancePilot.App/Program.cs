@@ -13,7 +13,8 @@ static class Program
         {
             var monitor = new FortniteLogMonitor();
             monitor.Poll(DateTimeOffset.UtcNow);
-            File.WriteAllText(args[1], System.Text.Json.JsonSerializer.Serialize(monitor.Latest, Inspection.Json));
+            File.WriteAllText(args[1], System.Text.Json.JsonSerializer.Serialize(new
+                { monitor.Latest, monitor.Playtime, monitor.ResultAvailableAt }, Inspection.Json));
             return;
         }
         if (args.Length == 2 && args[0] == "--analyze-current-screen")

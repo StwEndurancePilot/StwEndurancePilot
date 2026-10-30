@@ -5,6 +5,22 @@ namespace EndurancePilot.App;
 
 public partial class SettingsPane : System.Windows.Controls.UserControl
 {
+    internal void ConfigureTransitionFocus(bool enabled, Func<bool, string?> save)
+    {
+        bool saved = enabled, changing = false;
+        TransitionFocusToggle.IsChecked = enabled;
+        void Changed(object sender, RoutedEventArgs e)
+        {
+            if (changing) return;
+            bool next = TransitionFocusToggle.IsChecked == true;
+            string? error = save(next);
+            if (error is null) saved = next;
+            else { changing = true; TransitionFocusToggle.IsChecked = saved; changing = false; }
+            SaveStatus.Text = error ?? "Settings saved.";
+        }
+        TransitionFocusToggle.Checked += Changed;
+        TransitionFocusToggle.Unchecked += Changed;
+    }
     internal void ConfigureLifecycle(RunnerSettings settings, Func<bool, bool, string?> save)
     {
         bool close = settings.CloseToTray, startup = settings.StartWithWindows, changing = false;

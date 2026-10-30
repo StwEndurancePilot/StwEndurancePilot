@@ -48,7 +48,7 @@ public sealed partial class MainForm
 
     internal RunnerSettings ReadSettings() => new((HomebaseZone)zone.SelectedItem!, (int)runLimit.Value,
         launchIfMissing.Checked, indefinite.Checked, manualThemeEnabled, manualDarkTheme, targetWave, webhook,
-        endRunWhenTargetReached, waitForAssistance, autoResumeFortnite, autoResumeIdleSeconds, startStopHotkey, closeToTray, startWithWindows, autoImportPenny);
+        endRunWhenTargetReached, waitForAssistance, autoResumeFortnite, autoResumeIdleSeconds, startStopHotkey, closeToTray, startWithWindows, autoImportPenny, automaticTransitionFocus);
     internal void SetLifecycle(bool closeToTray, bool startup)
     {
         bool previousStartup = startWithWindows;
@@ -146,6 +146,7 @@ public sealed partial class MainForm
         startWithWindows = value.StartWithWindows; autoImportPenny = value.AutoImportPenny;
         autoResumeFortnite = value.AutoResumeFortnite;
         autoResumeIdleSeconds = value.AutoResumeIdleSeconds;
+        automaticTransitionFocus = value.AutomaticTransitionFocus;
         ConfigureWebhook(value.Webhook!);
     }
     internal void ApplyAppearance(bool manual, bool dark)
@@ -195,6 +196,20 @@ public sealed partial class MainForm
                     ? "Wave updates continue from Fortnite's local log, including while minimized. Game controls wait until you return."
                     : status.Text.StartsWith("Waiting for a") || status.Text.StartsWith("Background capture")
                     ? status.Text : "Return to Fortnite to resume game controls. Pilot will not focus or restore the game.";
+                if (SleepSignal is not null)
+                {
+                    heading = "Fortnite needs Keep Playing";
+                    detail = automaticTransitionFocus ? "Keep Playing is queued; Pilot will focus Fortnite once and verify the button."
+                        : "Keep Playing detected. Return to Fortnite to wake it, or enable automatic wake and next-run focus in Settings.";
+                }
+                else if (gameLog.ResultAvailableAt >= runner.StartedAt)
+                {
+                    heading = "Run result ready";
+                    detail = runSession.AttemptLimit == 1 ? "This profile stops after one attempt. Enable Indefinite for repeating runs."
+                        : automaticTransitionFocus ? "Checking rewards and preparing the next run."
+                        : "Return to Fortnite to collect rewards and continue the next run.";
+                }
+                if (transitionError is not null) detail = transitionError;
             }
             else if (interactionPause.Active)
             {

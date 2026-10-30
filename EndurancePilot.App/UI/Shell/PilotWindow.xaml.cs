@@ -559,6 +559,11 @@ public partial class PilotWindow : FluentWindow
             try { host.SetLifecycle(closeToTray, startup); return null; }
             catch { return "Could not save background settings. No changes were applied."; }
         });
+        settingsPane.ConfigureTransitionFocus(host.ReadSettings().AutomaticTransitionFocus, enabled =>
+        {
+            try { host.SetAutomaticTransitionFocus(enabled); RefreshState(); return null; }
+            catch (Exception error) { return error.Message; }
+        });
         settingsPane.CheckUpdatesRequested += async (_, _) => await CheckUpdatesAsync();
         settingsPane.ConfigurePennyImport(host.ReadSettings().AutoImportPenny, enabled =>
         {

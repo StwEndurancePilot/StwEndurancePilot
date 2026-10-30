@@ -176,6 +176,14 @@ public sealed class RunnerSession
         return new(action, outcome, false);
     }
 
+    public bool ObserveLogWave(GameLogWave? wave, DateTimeOffset now, DateTimeOffset? resultAt = null)
+    {
+        if (resultAt < StartedAt) return false;
+        if (!IsRunning || wave is null || !Tracker.ObserveLogWave(wave, now)) return false;
+        Controller.ObserveRunInProgress();
+        return true;
+    }
+
     public SessionUpdate ObserveBackground(Observation frame, ScreenEvidence evidence)
     {
         if (!IsRunning)

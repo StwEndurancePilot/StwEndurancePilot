@@ -24,6 +24,8 @@ public sealed partial class MainForm
 
     private void CancelInput()
     {
+        transitionFocus.Cancel();
+        transitionPreviousWindow = transitionGameWindow = 0;
         inputCancellation.Cancel();
         inputCancellation.Dispose();
         inputCancellation = new();
@@ -57,6 +59,7 @@ public sealed partial class MainForm
     private void WaitForUserInput(string reason)
     {
         if (!runner.IsRunning || runner.ControlsPaused || controller.Status == ControllerStatus.PausedForAttention) return;
+        if (transitionFocus.Active is not null) CancelInput();
         runner.ReacquireInput();
         InvalidateRecoveryObservation();
         interactionPause.Begin();
@@ -71,11 +74,7 @@ public sealed partial class MainForm
         if (runner.ControlsPaused) return false;
         if (!interactionPause.Active) return true;
         bool gotPointer = GetCursorPos(out var point);
-        bool held = false;
-        for (int key = 1; key < 255; key++)
-        {
-            if ((GetAsyncKeyState(key) & 0x8000) != 0) { held = true; break; }
-        }
+        bool held = InputIsHeld();
         if (!interactionPause.Ready(DateTimeOffset.UtcNow, game.IsForeground, held || !gotPointer, point.X, point.Y))
         {
             timer.Interval = 250;
@@ -85,6 +84,15 @@ public sealed partial class MainForm
         runner.ReacquireInput();
         status.Text = "Input idle · reacquiring Fortnite before resuming.";
         return true;
+    }
+
+    private static bool InputIsHeld()
+    {
+        for (int key = 1; key < 255; key++)
+        {
+            if ((GetAsyncKeyState(key) & 0x8000) != 0) return true;
+        }
+        return false;
     }
 
     [StructLayout(LayoutKind.Sequential)]

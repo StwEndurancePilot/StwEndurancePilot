@@ -117,6 +117,7 @@ public sealed partial class MainForm : Form
         startWithWindows = saved.StartWithWindows; autoImportPenny = saved.AutoImportPenny;
         autoResumeFortnite = saved.AutoResumeFortnite;
         autoResumeIdleSeconds = saved.AutoResumeIdleSeconds;
+        automaticTransitionFocus = saved.AutomaticTransitionFocus;
         launchIfMissing.Checked = saved.LaunchIfMissing;
         settings.Controls.Add(zone);
         settings.Controls.Add(new Label { Text = "Attempt limit", AutoSize = true, Padding = new Padding(10, 5, 0, 0) });
@@ -165,7 +166,17 @@ public sealed partial class MainForm : Form
             var cycleClock = System.Diagnostics.Stopwatch.StartNew();
             try
             {
-                if (runner.IsRunning) gameLog.Poll(DateTimeOffset.UtcNow);
+                if (runner.IsRunning)
+                {
+                    gameLog.Poll(DateTimeOffset.UtcNow);
+                    transitionFocus.ObserveLogWave(gameLog.Latest);
+                    if (runner.ObserveLogWave(gameLog.Latest, DateTimeOffset.UtcNow, gameLog.ResultAvailableAt))
+                    {
+                        log.Write("run-progress-from-log", tracker.Current!);
+                        RefreshProgress();
+                    }
+                }
+                if (await HandleTransitionFocusAsync()) return;
                 if (runnerMode)
                 {
                     var processes = EpicLauncher.Inspect();
@@ -483,6 +494,9 @@ public sealed partial class MainForm : Form
         gameLog.Reset();
         CancelInput();
         session++;
+        transitionFocus.Reset();
+        screenSleepSince = null;
+        transitionError = null;
         launcher.Stop();
         launchSelectedAccountOnStart = false;
         nextDiagnostics = default;
@@ -638,6 +652,8 @@ public sealed partial class MainForm : Form
             }
 
             evidence = recognizer.Recognize(observation);
+            if (evidence.Kind == ScreenKind.SleepMode) screenSleepSince ??= observation.CapturedAt;
+            else if (evidence.Kind is not (ScreenKind.Unknown or ScreenKind.Loading)) screenSleepSince = null;
             observationOnly = game is not null && (observationOnly || !ControlsCurrent(capturedSession, capturedGeneration, game));
             if (observationOnly) InvalidateRecoveryObservation();
             double recognitionMilliseconds = recognitionClock.Elapsed.TotalMilliseconds;
@@ -758,8 +774,18 @@ public sealed partial class MainForm : Form
                     AddActivity("Screen: " + evidence.Kind);
                 }
                 var action = update.Action;
+                if (transitionFocus.Finished(evidence.Kind))
+                {
+                    ReleaseTransitionFocus();
+                    return;
+                }
                 if (!observationOnly && action is not null)
                 {
+                    if (!transitionFocus.AllowsAction(action.Step))
+                    {
+                        ReleaseTransitionFocus();
+                        return;
+                    }
                     log.Write("navigation-timing", new
                     {
                         action.Id,
@@ -783,6 +809,7 @@ public sealed partial class MainForm : Form
                         var sentAt = DateTimeOffset.UtcNow;
                         if (!ControlsCurrent(capturedSession, capturedGeneration, game)
                             || !runner.TryDispatched(action, sentAt, capturedGeneration)) return;
+                        transitionFocus.Dispatched(action.Step);
                         if (notificationSession && action.SourceScreen is ScreenKind.ErrorDialog or ScreenKind.NeedsAttention)
                         {
                             notifications.Error(tracker.Current?.HighestWave);
@@ -954,7 +981,11 @@ public sealed partial class MainForm : Form
         });
     }
 
-    private void StopAfterSession() => Stop($"Session attempt limit reached ({runSession.AttemptsEnded}/{runSession.AttemptLimit}). Last outcome: {runSession.LastOutcome?.Outcome}");
+    private void StopAfterSession()
+    {
+        if (transitionFocus.Active is not null) ReleaseTransitionFocus();
+        Stop($"Session attempt limit reached ({runSession.AttemptsEnded}/{runSession.AttemptLimit}). Last outcome: {runSession.LastOutcome?.Outcome}");
+    }
 
     [DllImport("user32.dll", SetLastError = true)] private static extern bool RegisterHotKey(nint window, int id, uint modifiers, uint key);
     [DllImport("user32.dll")] private static extern bool UnregisterHotKey(nint window, int id);

@@ -131,6 +131,8 @@
           <StackPanel>
             <TextBlock Text="Monitor in the background" FontSize="14" FontWeight="SemiBold" />
             <TextBlock Text="Pilot reads wave starts from Fortnite's local log even while minimized. Live countdowns and rewards need window capture. Controls resume when you return to Fortnite. Pause keeps controls off until Resume; Stop ends the session." FontSize="12" TextWrapping="Wrap" LineHeight="18" Foreground="{DynamicResource PilotSecondary}" Margin="0,6,0,0" />
+            <ui:ToggleSwitch x:Name="TransitionFocusToggle" Content="Automatic wake and next-run focus" AutomationProperties.Name="Automatic wake and next-run focus" Margin="0,16,0,0" />
+            <TextBlock Text="Allow Pilot to bring Fortnite forward for Keep Playing or the next Endurance run, then return to your previous window. Switching away, Pause, or Stop cancels that action. Enable Indefinite above to repeat runs." FontSize="12" TextWrapping="Wrap" LineHeight="18" Foreground="{DynamicResource PilotSecondary}" Margin="0,6,0,0" />
           </StackPanel>
         </Border>
         <TextBlock Text="SHORTCUT" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PilotSecondary}" Margin="0,24,0,12" />

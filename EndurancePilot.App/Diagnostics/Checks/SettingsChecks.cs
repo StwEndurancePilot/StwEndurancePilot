@@ -17,6 +17,7 @@ internal static class SettingsChecks
             Check("Penny startup import defaults on", store.Load(out warning).AutoImportPenny);
             Check("End at target defaults on", store.Load(out warning).EndRunWhenTargetReached);
             Check("Wait for assistance defaults off", !store.Load(out warning).WaitForAssistance);
+            Check("Automatic transition focus requires opt-in", !store.Load(out warning).AutomaticTransitionFocus);
             Check("New settings disable legacy automatic refocus", store.Load(out warning) is { AutoResumeFortnite: false, AutoResumeIdleSeconds: 10 });
             Check("Existing shortcut defaults to F10", store.Load(out warning).StartStopHotkey == "F10"
                 && RunnerHotkey.Resolve("F10") is (0x4000u, 0x79u));
@@ -77,6 +78,10 @@ internal static class SettingsChecks
             {
                 Check("New app host restores all saved runner preferences", host.ReadSettings() == saved with { Webhook = new WebhookSettings() });
                 host.ApplySettings(host.ReadSettings() with { AutoResumeFortnite = true, AutoResumeIdleSeconds = 17 });
+                Check("Legacy idle focus does not authorize transition focus", !host.ReadSettings().AutomaticTransitionFocus);
+                host.SetAutomaticTransitionFocus(true);
+                Check("Transition focus preference persists", store.Load(out warning).AutomaticTransitionFocus);
+                host.SetAutomaticTransitionFocus(false);
                 Check("Legacy focus values remain round-trippable without a focus control", host.ReadSettings() is { AutoResumeFortnite: true, AutoResumeIdleSeconds: 17 }
                     && store.Load(out warning).AutoResumeIdleSeconds == 17);
                 var firstSetup = new WebhookSettings(Enabled: true);

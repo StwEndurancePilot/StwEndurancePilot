@@ -46,6 +46,44 @@ public sealed record GameWindow(nint Handle, int ProcessId, Rectangle ClientBoun
 
     public bool IsForeground => GetForegroundWindow() == Handle;
     public bool Activate() => SetForegroundWindow(Handle);
+
+    internal static async Task<(nint Game, nint Previous)?> FocusForTransitionAsync(Func<bool> isCurrent, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        if (!isCurrent()) return null;
+        nint handle;
+        int processId;
+        var processes = Process.GetProcessesByName(ProcessName);
+        try
+        {
+            if (processes.Length != 1) return null;
+            handle = processes[0].MainWindowHandle;
+            processId = processes[0].Id;
+        }
+        finally { foreach (var process in processes) process.Dispose(); }
+        if (handle == 0) return null;
+        nint previous = GetForegroundWindow();
+        bool focused = false;
+        try
+        {
+            if (IsIconic(handle)) ShowWindowAsync(handle, 9);
+            await Task.Delay(150, token);
+            if (!isCurrent() || Find() is not { } game || game.Handle != handle || game.ProcessId != processId) return null;
+            // No Alt tap, input queue attachment, or background keystrokes.
+            if (!game.IsForeground && !SetForegroundWindow(handle)) return null;
+            await Task.Delay(100, token);
+            focused = isCurrent() && game.IsForeground && Find() == game;
+            return focused ? (handle, previous) : null;
+        }
+        finally { if (!focused && isCurrent()) ReturnTransitionFocus(handle, previous); }
+    }
+
+    internal static bool ReturnTransitionFocus(nint game, nint previous)
+    {
+        if (game == 0 || previous == game || GetForegroundWindow() != game) return true;
+        return previous != 0 && previous != game && IsWindow(previous)
+            && IsWindowVisible(previous) && SetForegroundWindow(previous);
+    }
     public Bitmap Capture()
     {
         if (!IsForeground)
@@ -96,4 +134,6 @@ public sealed record GameWindow(nint Handle, int ProcessId, Rectangle ClientBoun
     [DllImport("user32.dll")] private static extern bool IsIconic(nint hwnd);
     [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
     [DllImport("user32.dll")] private static extern bool SetForegroundWindow(nint hwnd);
+    [DllImport("user32.dll")] private static extern bool IsWindow(nint hwnd);
+    [DllImport("user32.dll")] private static extern bool ShowWindowAsync(nint hwnd, int command);
 }

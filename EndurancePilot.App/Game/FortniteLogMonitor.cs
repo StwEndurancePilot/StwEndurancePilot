@@ -16,12 +16,16 @@ internal sealed class FortniteLogMonitor(string? path = null)
     private GameLogProgress? progress;
     private DateTimeOffset nextPoll;
     internal GameLogWave? Latest { get; private set; }
+    internal GameLogPlaytime? Playtime { get; private set; }
+    internal DateTimeOffset? ResultAvailableAt { get; private set; }
 
     internal void Reset()
     {
         owner = null;
         progress = null;
         Latest = null;
+        Playtime = null;
+        ResultAvailableAt = null;
         position = 0;
         pending.Clear();
         skipLine = false;
@@ -90,6 +94,8 @@ internal sealed class FortniteLogMonitor(string? path = null)
                 }
             }
             Latest = progress?.Latest;
+            Playtime = progress?.Playtime;
+            ResultAvailableAt = progress?.ResultAvailableAt;
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {

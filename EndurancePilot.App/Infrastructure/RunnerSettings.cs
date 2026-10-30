@@ -10,7 +10,8 @@ internal sealed record RunnerSettings(HomebaseZone Zone = HomebaseZone.TwinePeak
     WebhookSettings? Webhook = null, bool EndRunWhenTargetReached = true, bool WaitForAssistance = false,
     // Legacy values are preserved for compatibility; they never authorize refocusing.
     bool AutoResumeFortnite = false, int AutoResumeIdleSeconds = 10,
-    string StartStopHotkey = RunnerHotkey.Default, bool CloseToTray = true, bool StartWithWindows = false, bool AutoImportPenny = true)
+    string StartStopHotkey = RunnerHotkey.Default, bool CloseToTray = true, bool StartWithWindows = false, bool AutoImportPenny = true,
+    bool AutomaticTransitionFocus = false)
 {
     public void Validate()
     {

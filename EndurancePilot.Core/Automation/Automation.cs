@@ -156,6 +156,12 @@ public sealed class AutomationController
         }
     }
 
+    public void ObserveRunInProgress()
+    {
+        RunInProgress = true;
+        navigationActions = 0;
+    }
+
     public void RequestTargetExit(string reason = "Target wave finished · preparing to leave Storm Shield")
     {
         if (TargetExitRequested || ErrorRecoveryOnly || Status is ControllerStatus.Stopped or ControllerStatus.PausedForAttention)

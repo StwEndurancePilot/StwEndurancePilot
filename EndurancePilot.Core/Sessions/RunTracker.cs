@@ -25,6 +25,23 @@ public sealed class RunTracker
     private ScreenKind resultCandidate;
     private DateTimeOffset resultSince;
     private int resultHits;
+    private DateTimeOffset lastLogWave;
+
+    public bool ObserveLogWave(GameLogWave wave, DateTimeOffset now)
+    {
+        if (wave.Wave is < 1 or > 30 || wave.StartedAt <= lastLogWave || wave.StartedAt > now
+            || now - wave.StartedAt > TimeSpan.FromMinutes(20)
+            || Current?.EndedAt >= wave.StartedAt) return false;
+        lastLogWave = wave.StartedAt;
+        if (Current is null || Current.Outcome != RunOutcome.InProgress)
+            Current = new(Guid.NewGuid(), wave.StartedAt, null, wave.Wave, RunOutcome.InProgress);
+        else if (wave.Wave > Current.HighestWave)
+            Current = Current with { HighestWave = wave.Wave };
+        else return false;
+        if (wave.StartedAt > LastConfirmedWaveAt) LastConfirmedWaveAt = wave.StartedAt;
+        Detail = $"Wave {Current.HighestWave} reported by Fortnite; awaiting a confirmed result";
+        return true;
+    }
 
     public RunRecord? Observe(Observation frame, ScreenEvidence screen)
     {
