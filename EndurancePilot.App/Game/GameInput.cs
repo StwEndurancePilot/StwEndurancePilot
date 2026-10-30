@@ -39,6 +39,32 @@ internal static class GameInput
         return GameWindow.Find() == game && game.IsForeground;
     }
 
+    // Background endurance: bring back the window the user was using.
+    internal static async Task<bool> FocusWindowAsync(nint window, CancellationToken cancellation)
+    {
+        cancellation.ThrowIfCancellationRequested();
+        if (GetForegroundWindow() == window) return true;
+        SetForegroundWindow(window);
+        await Task.Delay(100, cancellation);
+        if (GetForegroundWindow() == window) return true;
+        for (int key = 1; key < 255; key++)
+            if ((GetAsyncKeyState(key) & 0x8000) != 0) return false;
+        var down = new NativeInput { Type = 1, Data = new() { Keyboard = new() { VirtualKey = 0x12 } } };
+        var up = new NativeInput { Type = 1, Data = new() { Keyboard = new() { VirtualKey = 0x12, Flags = 2 } } };
+        uint inserted = SendInput(2, [down, up], Marshal.SizeOf<NativeInput>());
+        if (inserted != 2)
+        {
+            if (inserted == 1) SendInput(1, [up], Marshal.SizeOf<NativeInput>());
+            return false;
+        }
+        await Task.Delay(100, cancellation);
+        SetForegroundWindow(window);
+        await Task.Delay(250, cancellation);
+        return GetForegroundWindow() == window;
+    }
+    [DllImport("user32.dll")] private static extern bool SetForegroundWindow(nint window);
+    [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
+
     public static async Task<bool> DispatchAsync(GameWindow game, Bitmap observedImage, ClickAction action,
         OcrService ocr, Func<bool> sessionIsCurrent, CancellationToken cancellation)
     {
