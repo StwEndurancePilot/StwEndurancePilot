@@ -173,7 +173,16 @@ public partial class PilotWindow : FluentWindow
         StatusDetail.Visibility = string.IsNullOrWhiteSpace(StatusDetail.Text) ? Visibility.Collapsed : Visibility.Visible;
         StatusDetail.ToolTip = StatusDetail.Text;
         PrimaryButton.ToolTip = StatusDetail.Text;
-        WaveNumber.Text = (s.Wave ?? 0).ToString("00");
+        int? displayedWave = s.LiveWave?.Wave ?? s.Wave;
+        WaveNumber.Text = (displayedWave ?? 0).ToString("00");
+        WavePhaseLabel.Text = s.LiveWave is { Starting: true } ? "NEXT WAVE" : s.LiveWave is not null ? "ACTIVE WAVE" : "WAVE PROGRESS";
+        WaveTimerLabel.Text = s.LiveWave is { Starting: true } ? "STARTS IN" : "WAVE REMAINING";
+        WaveTimerText.Text = s.LiveWave is { } live ? $"{(int)live.Remaining.TotalMinutes}:{live.Remaining.Seconds:D2}" : "--:--";
+        ElapsedText.Text = $"{(int)Math.Max(0, s.Elapsed.TotalHours):D2}:{s.Elapsed.Minutes:D2}:{s.Elapsed.Seconds:D2}";
+        WaveFreshnessText.Text = s.LiveWave is { Remaining: var remaining } ? remaining == TimeSpan.Zero
+            ? "Waiting for the game to confirm the next phase" : "Live game timer"
+            : s.WaveAge is { } age ? $"Last confirmed wave {s.Wave} · {Math.Max(0, (int)age.TotalSeconds)}s ago · waiting for HUD"
+            : "Waiting for a fresh game frame";
         int targetWave = host.ReadSettings().EndRunWhenTargetReached ? host.ReadSettings().TargetWave : 30;
         WaveTarget.Text = $"/ {targetWave}";
         if (WaveSegments.Children.Count != targetWave)
@@ -184,7 +193,10 @@ public partial class PilotWindow : FluentWindow
                 WaveSegments.Children.Add(new Border { CornerRadius = new CornerRadius(2), Margin = new Thickness(0, 0, i == targetWave - 1 ? 0 : 4, 0) });
             }
         }
-        System.Windows.Automation.AutomationProperties.SetName(WaveNumber, s.Wave is null ? "No wave detected" : $"Highest confirmed wave {s.Wave}; target {targetWave}");
+        System.Windows.Automation.AutomationProperties.SetName(WaveNumber, displayedWave is null ? "No wave detected"
+            : $"{(s.LiveWave is { Starting: true } ? "Upcoming" : "Observed")} wave {displayedWave}; target {targetWave}");
+        System.Windows.Automation.AutomationProperties.SetName(WaveTimerText, $"{WaveTimerLabel.Text}: {WaveTimerText.Text}");
+        System.Windows.Automation.AutomationProperties.SetName(ElapsedText, "Session elapsed " + ElapsedText.Text);
         PrimaryText.Text = s.Running ? "Stop runner" : "Start endurance";
         PauseButton.Content = s.Paused ? "Resume" : "Pause";
         PauseButton.Visibility = s.Running && !s.Attention ? Visibility.Visible : Visibility.Collapsed;

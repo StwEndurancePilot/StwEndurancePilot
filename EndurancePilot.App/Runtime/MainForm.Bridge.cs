@@ -3,7 +3,7 @@ using EndurancePilot.Core;
 namespace EndurancePilot.App;
 
 internal sealed record PilotSnapshot(bool Running, bool Attention, bool Paused, bool Background, string Headline, string Detail, int? Wave,
-    int Completed, string Activity);
+    int Completed, string Activity, WaveProgressSnapshot? LiveWave, TimeSpan Elapsed, TimeSpan? WaveAge);
 
 public sealed partial class MainForm
 {
@@ -203,8 +203,11 @@ public sealed partial class MainForm
         var current = tracker.Current;
         int? activeWave = runner.IsRunning && current is { Outcome: RunOutcome.InProgress, EndedAt: null }
             ? current.HighestWave : null;
+        var now = DateTimeOffset.UtcNow;
+        var elapsed = runner.StartedAt is { } started ? (stoppedAt ?? now) - started : TimeSpan.Zero;
+        var age = activeWave is not null && tracker.LastConfirmedWaveAt != default ? now - tracker.LastConfirmedWaveAt : (TimeSpan?)null;
         return new(runner.IsRunning, attention, InputPaused, background, heading, detail, activeWave, runSession.CompletedRuns,
-            string.Join(Environment.NewLine, activity.Items.Cast<string>().Reverse().Take(80)));
+            string.Join(Environment.NewLine, activity.Items.Cast<string>().Reverse().Take(80)), runner.WaveProgress.Snapshot(now), elapsed, age);
     }
     internal void ShowTechnicalDetails()
     {

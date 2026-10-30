@@ -28,6 +28,7 @@ public static class Inspection
             {
                 Screen = evidence,
                 Observation = observation,
+                WaveHud = WaveHud.Read(observation),
                 Navigation = navigation,
                 Rewards = MissionRewardReader.Read(observation, evidence)
             }, Json));

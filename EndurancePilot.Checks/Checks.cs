@@ -19,6 +19,7 @@ HestiaEntryScenarios.Run(Check, epoch);
 LoadedEntryScenarios.Run(Check, epoch);
 AnnouncementScenarios.Run(Check, epoch);
 ControlPauseScenarios.Run(Check, epoch);
+WaveProgressScenarios.Run(Check, epoch);
 DetectedHomebaseScenarios.Run(Check, epoch);
 var tracker = new RunTracker();
 RunRecord? Observe(int second, params string[] text)

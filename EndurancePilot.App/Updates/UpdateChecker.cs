@@ -31,8 +31,18 @@ internal sealed class UpdateChecker : IDisposable
     }
     private static Version ReadInstalledVersion()
     {
-        var value = typeof(UpdateChecker).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0];
-        return ParseVersion(value) ?? new Version(0, 0, 0);
+        var assembly = typeof(UpdateChecker).Assembly;
+        return ParseInstalledVersion(assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion,
+            assembly.GetName().Version);
+    }
+
+    internal static Version ParseInstalledVersion(string? informational, Version? assemblyVersion)
+    {
+        // Local build labels are not release tags. Compare their numeric base
+        // version without relaxing the strict parser for remote release tags.
+        var version = ParseVersion(informational?.Split('+', '-')[0]);
+        return version ?? (assemblyVersion is null ? new Version(0, 0, 0)
+            : new Version(assemblyVersion.Major, assemblyVersion.Minor, Math.Max(0, assemblyVersion.Build)));
     }
     internal static Version? ParseVersion(string? tag)
     {

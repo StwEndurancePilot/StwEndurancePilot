@@ -20,6 +20,10 @@ Switching to another app keeps wave, result and reward monitoring active when Fo
 
 The Twine Peaks route prefers a reliable detected homebase icon and an unambiguous SELECT control, then verifies My Storm Shield before launch. Full unattended wave-30 repetition and arbitrary roaming are not verified.
 
+The dashboard distinguishes **Active wave / Wave remaining** from **Next wave / Starts in**, alongside session elapsed time. It confirms HUD readings across frames and smoothly counts down between fresh captures. A timer reaching zero does not itself prove that the next wave started. When no fresh HUD arrives for five seconds, the timer becomes unavailable and the dashboard labels the last confirmed wave. An upcoming wave does not increment confirmed run progress. Monitoring and session elapsed time continue during Pause because Fortnite's mission keeps running.
+
+Local build suffixes (for example, `1.0.44-local.2`) compare updates against their numeric release base; they no longer appear as version `0.0.0` and offer the same release as an update.
+
 ### Updating without losing preferences
 
 Installed and portable releases use the same `%LOCALAPPDATA%\EndurancePilot` data directory, independent of the executable version. Install updates under the same Windows account. Setup snapshots existing settings, encrypted account files, lifetime earnings and Discord pairing into `update-backups\<version>-<timestamp>` in that directory before replacing the app. It stops if a present data file cannot be backed up. These backups contain private data and should not be uploaded to bug reports.

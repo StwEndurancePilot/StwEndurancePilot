@@ -308,7 +308,7 @@ public sealed record WaveReading(int Wave, Box Bounds);
 public static class WaveReader
 {
     public static IReadOnlyList<WaveReading> ReadCountdown(Observation frame) => frame.Regions
-        .Select(region => (region, match: Regex.Match(region.Normalized, @"\bDEFENSE:?\s+WAVE\s+(\d{1,2})\s+STARTS\b")))
+        .Select(region => (region, match: Regex.Match(region.Normalized, @"(?:\bDEFENSE:?|^ENDURANCE(?:\s+[A-Z]+){0,3}:?)\s+WAVE\s+(\d{1,2})\s+STARTS\b")))
         .Where(item => item.match.Success && int.TryParse(item.match.Groups[1].Value, out int wave) && wave is >= 1 and <= 30)
         .Select(item => new WaveReading(int.Parse(item.match.Groups[1].Value), item.region.Bounds)).ToArray();
 
@@ -317,7 +317,7 @@ public static class WaveReader
         var readings = new List<WaveReading>();
         foreach (var region in frame.Regions)
         {
-            if (Regex.IsMatch(region.Normalized, @"\b(STARTS|MAX WAVE)\b"))
+            if (Regex.IsMatch(region.Normalized, @"\b(STARTS|INCOMING|MAX WAVE)\b"))
             {
                 continue;
             }

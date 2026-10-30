@@ -85,7 +85,7 @@
           <Grid x:Name="HeadlineRow" Margin="1,0,1,14">
             <TextBlock x:Name="Headline" FontSize="14" FontWeight="Medium" VerticalAlignment="Center" />
           </Grid>
-          <Border CornerRadius="18" Background="{DynamicResource PilotSurface}" BorderBrush="{DynamicResource PilotBorder}" BorderThickness="1" ClipToBounds="True">
+          <Border x:Name="WaveProgressCard" CornerRadius="18" Background="{DynamicResource PilotSurface}" BorderBrush="{DynamicResource PilotBorder}" BorderThickness="1" ClipToBounds="True">
             <Grid>
               <Canvas HorizontalAlignment="Right" VerticalAlignment="Top" Width="150" Height="185" Opacity="0.38" IsHitTestVisible="False">
                 <Path Data="M 65,0 L 150,85 M 105,0 L 150,45 M 25,0 L 150,125 M -15,0 L 150,165" Stroke="{DynamicResource PilotBorder}" StrokeThickness="1" />
@@ -96,7 +96,7 @@
                     <ColumnDefinition />
                     <ColumnDefinition Width="Auto" />
                   </Grid.ColumnDefinitions>
-                  <TextBlock Text="WAVE PROGRESS" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PilotSecondary}" />
+                  <TextBlock x:Name="WavePhaseLabel" Text="WAVE PROGRESS" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PilotSecondary}" />
                 </Grid>
                 <Grid Margin="-4,4,0,8">
                   <Grid.ColumnDefinitions>
@@ -108,6 +108,18 @@
                   <TextBlock x:Name="WaveTarget" Text="/ 30" Grid.Column="1" FontSize="24" Margin="12,0,0,19" VerticalAlignment="Bottom" Foreground="{DynamicResource PilotSecondary}" />
                 </Grid>
                 <UniformGrid x:Name="WaveSegments" Rows="1" Height="23" />
+                <Grid Margin="0,18,0,0">
+                  <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock x:Name="WaveTimerLabel" Text="WAVE REMAINING" FontSize="10" Foreground="{DynamicResource PilotSecondary}" />
+                    <TextBlock x:Name="WaveTimerText" Text="--:--" FontSize="27" FontFamily="Bahnschrift, Segoe UI" Margin="0,3,0,0" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                    <TextBlock Text="SESSION ELAPSED" FontSize="10" Foreground="{DynamicResource PilotSecondary}" />
+                    <TextBlock x:Name="ElapsedText" Text="00:00:00" FontSize="27" FontFamily="Bahnschrift, Segoe UI" Margin="0,3,0,0" />
+                  </StackPanel>
+                </Grid>
+                <TextBlock x:Name="WaveFreshnessText" Text="Waiting for a fresh game frame" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource PilotSecondary}" Margin="0,8,0,0" />
               </StackPanel>
             </Grid>
           </Border>

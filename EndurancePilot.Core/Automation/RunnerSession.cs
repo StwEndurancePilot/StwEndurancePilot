@@ -44,6 +44,7 @@ public sealed class RunnerSession
     }
 
     public RunTracker Tracker { get; } = new();
+    public WaveProgress WaveProgress { get; } = new();
     public MissionRewardTracker Rewards { get; } = new();
     public AutomationController Controller { get; } = new();
     public SessionProgress Progress { get; private set; } = new(1);
@@ -75,6 +76,7 @@ public sealed class RunnerSession
 
         Controller.Stop();
         Rewards.Reset();
+        WaveProgress.Reset();
         Mode = mode;
         Progress = progress;
         StartedAt = now;
@@ -98,6 +100,8 @@ public sealed class RunnerSession
         {
             return new(null, null, false);
         }
+
+        WaveProgress.Observe(frame, evidence, Tracker.Current);
 
         bool abandoning = Controller.Pending?.Step == NavigationStep.AbandonRejoin;
         bool dismissingError = Mode != RunnerMode.Observe && (evidence.Kind is ScreenKind.ErrorDialog or ScreenKind.NeedsAttention
@@ -180,6 +184,7 @@ public sealed class RunnerSession
         }
 
         ReacquireInput();
+        WaveProgress.Observe(frame, evidence, Tracker.Current);
         Rewards.Observe(frame, evidence, Tracker.Current);
         if (Mode == RunnerMode.Runner && evidence.AllowsInput)
         {
@@ -276,6 +281,7 @@ public sealed class RunnerSession
         IsRunning = false;
         ControlsPaused = false;
         InputGeneration++;
+        WaveProgress.Reset();
         Controller.Stop(reason);
     }
 }

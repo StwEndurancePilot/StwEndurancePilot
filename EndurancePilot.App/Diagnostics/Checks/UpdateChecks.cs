@@ -39,6 +39,16 @@ internal static class UpdateChecks
         Check("Prerelease cannot enable a stable update", UpdateChecker.ParseRelease(Release(prerelease: true), installed).Status == UpdateStatus.NoRelease);
         Check("Unsupported tag is reported rather than guessed", UpdateChecker.ParseRelease(Release(tag: "nightly"), installed).Status == UpdateStatus.Unavailable);
         Check("Stable version parser rejects suffixes and paths", UpdateChecker.ParseVersion("v1.0.0-beta") is null && UpdateChecker.ParseVersion("../1.0.0") is null && UpdateChecker.ParseVersion("1.2.3") == new Version(1, 2, 3));
+        foreach (string information in new[] { "1.0.44-local.1", "1.0.44-local.2+abcdef", "1.0.44+abcdef" })
+        {
+            var local = UpdateChecker.ParseInstalledVersion(information, new(1, 0, 44, 0));
+            Check("Local build retains its release base: " + information, local == new Version(1, 0, 44)
+                && UpdateChecker.ParseRelease(Release(tag: "v1.0.44"), local).Status == UpdateStatus.Current);
+        }
+        Check("Missing informational version falls back to the assembly", UpdateChecker.ParseInstalledVersion(null, new(1, 2, 3, 4)) == new Version(1, 2, 3));
+        Check("Unsupported informational version never erases a known assembly version", UpdateChecker.ParseInstalledVersion("development", new(1, 2)) == new Version(1, 2, 0));
+        Check("A genuinely newer stable release remains available to a local build", UpdateChecker.ParseRelease(Release(tag: "v1.0.45"),
+            UpdateChecker.ParseInstalledVersion("1.0.44-local.2", null)).Status == UpdateStatus.Available);
         foreach (var assets in new[] { Array.Empty<object>(), new[] { Asset(url: "https://example.com/other.exe") }, new[] { Asset("wrong.exe") }, new[] { Asset(), Asset() } })
         {
             var fallback = UpdateChecker.ParseRelease(Release(assets: assets), installed);

@@ -72,6 +72,17 @@ public sealed class OcrService
                 return overview;
             }
 
+            if (enhance && new ScreenRecognizer().Recognize(overview).Kind is ScreenKind.ActiveEndurance or ScreenKind.EnduranceCountdown or ScreenKind.Unknown)
+            {
+                // Isolate the objective HUD from player names, inventory and the
+                // scene. This also avoids tiling the entire screen on each tick.
+                var hud = new Rectangle(source.Width / 4, 0, source.Width / 2, Math.Max(1, source.Height * 35 / 100));
+                await ReadCrop(source, hud, Math.Min(3, 1600d / Math.Max(hud.Width, hud.Height)), "wave-hud", regions, cancellation);
+                await ReadWaveTimers(source, capturedAt, regions, cancellation);
+                var progress = new Observation(capturedAt, source.Width, source.Height, regions);
+                if (WaveHud.Read(progress) is not null) return progress;
+            }
+
             if (overviewScale < .9)
             {
                 const int tile = 1400, overlap = 180;
@@ -209,7 +220,12 @@ public sealed class OcrService
                     }
                 }
             }
-            if (enhance && NeedsEnhancement(final, requireExitControls))
+            if (enhance)
+            {
+                await ReadWaveTimers(source, capturedAt, regions, cancellation);
+                final = new(capturedAt, source.Width, source.Height, regions);
+            }
+            if (enhance && WaveHud.Read(final) is null && NeedsEnhancement(final, requireExitControls))
             {
 
                 await ReadCrop(source, new(0, 0, source.Width, source.Height), overviewScale,
@@ -233,6 +249,38 @@ public sealed class OcrService
             return final;
         }
         finally { gate.Release(); }
+    }
+
+    private async Task ReadWaveTimers(Bitmap source, DateTimeOffset capturedAt, List<TextRegion> regions, CancellationToken cancellation)
+    {
+        Observation Frame() => new(capturedAt, source.Width, source.Height, regions);
+        if (WaveHud.Read(Frame()) is not null) return;
+        var labels = WaveReader.ReadCountdown(Frame()).Concat(WaveReader.Read(Frame()))
+            .Where(r => r.Bounds.CenterY < source.Height * .45).OrderByDescending(r => r.Bounds.Width).Take(3).ToArray();
+        foreach (var label in labels)
+        {
+            var b = label.Bounds;
+            double h = Math.Max(10, b.Height);
+            bool isolatedWave = regions.Any(r => r.Normalized.StartsWith("WAVE ", StringComparison.Ordinal)
+                && r.Bounds.IntersectionOverUnion(b) > .6);
+            double center = b.CenterX - (isolatedWave ? h * 3 : 0);
+            var clock = Rectangle.Intersect(new(0, 0, source.Width, source.Height),
+                Rectangle.FromLTRB((int)(center - h * 3.5), (int)(b.Bottom + h * .65), (int)(center + h * 3.5), (int)(b.Bottom + h * 3.5)));
+            if (clock.Width > 0 && clock.Height > 0)
+            {
+                await ReadCrop(source, clock, Math.Min(3, 1600d / Math.Max(clock.Width, clock.Height)), "wave-clock", regions, cancellation);
+                if (WaveHud.Read(Frame()) is not null) return;
+                await ReadCrop(source, clock, Math.Min(4, 1600d / Math.Max(clock.Width, clock.Height)), "wave-clock-white", regions, cancellation, TextTreatment.WhiteText);
+                if (WaveHud.Read(Frame()) is not null) return;
+            }
+            var crop = Rectangle.Intersect(new(0, 0, source.Width, source.Height),
+                Rectangle.FromLTRB((int)(b.X - h * 3), (int)(b.Bottom + h * .15), (int)(b.Right + h), (int)(b.Bottom + h * 4)));
+            if (crop.Width < 1 || crop.Height < 1) continue;
+            await ReadCrop(source, crop, Math.Min(3, 1600d / Math.Max(crop.Width, crop.Height)), "wave-timer", regions, cancellation);
+            if (WaveHud.Read(Frame()) is not null) return;
+            await ReadCrop(source, crop, Math.Min(4, 1600d / Math.Max(crop.Width, crop.Height)), "wave-timer-white", regions, cancellation, TextTreatment.WhiteText);
+            if (WaveHud.Read(Frame()) is not null) return;
+        }
     }
 
     private static bool HasCompleteMenuEvidence(Observation frame, bool requireExitControls = false)
