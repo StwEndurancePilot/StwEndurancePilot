@@ -185,6 +185,7 @@ RapidNavigationScenarios.Run(Check, epoch);
 SessionScenarios.Run(Check, epoch);
 RunRestartScenarios.Run(Check, epoch);
 RunnerSessionScenarios.Run(Check, epoch);
+WavesSurvivedContinueScenarios.Run(Check, epoch);
 TargetWaveScenarios.Run(Check, epoch);
 LaunchScenarios.Run(Check, epoch);
 CrashRecoveryScenarios.Run(Check, epoch);
