@@ -194,6 +194,19 @@ public sealed class AutomationController
             }
         }
 
+        // On the "WAVES SURVIVED" results, Escape does not advance on some setups.
+        // After one Escape attempt without a transition, click the Continue button instead.
+        if (evidence.Kind is ScreenKind.Victory or ScreenKind.Defeat && attempts >= 1
+            && frame.Has(@"\bWAVES SURVIVED\b"))
+        {
+            var continueButtons = frame.Find(@"^CONTINUE$").ToArray();
+            if (UniqueTarget(continueButtons) is { } continueButton)
+            {
+                return new(new(NavigationStep.ContinueResults, "Click Continue after Escape did not advance",
+                    continueButton), "Click Continue on the mission result");
+            }
+        }
+
         return TargetExitRequested
         && evidence.Kind is not (ScreenKind.RejoinDialog or ScreenKind.SleepMode or ScreenKind.Victory or ScreenKind.Defeat or ScreenKind.Rewards or ScreenKind.RewardClaim or ScreenKind.FeedbackSurvey or ScreenKind.NewUnlock)
         ? TargetWaveExit.Decide(frame, evidence) : NavigationPlanner.Decide(frame, evidence, Profile, HomebaseClickConfirmed);
@@ -609,9 +622,11 @@ public sealed class AutomationController
                     return null;
                 }
 
-                if (attempts >= 2)
+                // The mission map can still be panning when the homebase icon is first clicked.
+                int maximumAttempts = pending.Step == NavigationStep.SelectHomebase ? 5 : 2;
+                if (attempts >= maximumAttempts)
                 {
-                    Pause("The screen did not change after two verified input attempts.");
+                    Pause($"The screen did not change after {maximumAttempts} verified input attempts.");
                     return null;
                 }
                 Pending = null;
