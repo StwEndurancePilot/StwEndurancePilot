@@ -1,5 +1,5 @@
 # Endurance Pilot
-
+ 
 Endurance Pilot is a Windows app for running Fortnite **Save the World Storm Shield Endurance**. It navigates to your chosen Homebase, starts Endurance, tracks confirmed waves, collects mission rewards, and can repeat runs. It is early-access software, so check on a run if the game shows an unfamiliar screen.
 
 ![Endurance Pilot dashboard](docs/images/endurance-pilot-ui.png)
