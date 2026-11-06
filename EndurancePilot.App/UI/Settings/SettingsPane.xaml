@@ -63,6 +63,12 @@
         <TextBlock Text="RUN OPTIONS" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PilotSecondary}" Margin="0,24,0,12" />
         <Border CornerRadius="12" Background="{DynamicResource PilotSurface}" BorderBrush="{DynamicResource PilotBorder}" BorderThickness="1">
           <StackPanel x:Name="RunOptions">
+          <StackPanel Margin="18">
+          <TextBlock Text="Backpack / Storm Shield key" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,6" />
+          <TextBlock Text="Match Fortnite's inventory key (for example, I). Used to open Storm Shield controls when starting or leaving endurance. The quest-menu shortcut remains Tab. Stop the runner to change this." FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource PilotSecondary}" Margin="0,0,0,10" />
+          <ComboBox x:Name="BackpackKeyChoice" Height="38" Margin="0,0,0,18" AutomationProperties.Name="Backpack / Storm Shield key" />
+          </StackPanel>
+
             <Grid Margin="18,18">
               <Grid.ColumnDefinitions>
                 <ColumnDefinition />

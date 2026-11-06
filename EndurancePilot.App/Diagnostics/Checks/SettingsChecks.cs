@@ -21,7 +21,17 @@ internal static class SettingsChecks
             Check("Existing shortcut defaults to F10", store.Load(out warning).StartStopHotkey == "F10"
                 && RunnerHotkey.Resolve("F10") is (0x4000u, 0x79u));
             Check("Modified shortcut maps to Ctrl+Alt+F9", RunnerHotkey.Resolve("Ctrl+Alt+F9") is (0x4003u, 0x78u));
-            var saved = new RunnerSettings(EndurancePilot.Core.HomebaseZone.CannyValley, 3, false, false, CloseToTray: false, StartWithWindows: true, AutoImportPenny: false);
+            Check("Old settings retain Tab for backpack", System.Text.Json.JsonSerializer.Deserialize<RunnerSettings>("{}", Inspection.Json)!.BackpackKeybind == "Tab");
+            Check("Custom backpack key applies to entry and target exit only",
+                BackpackKey.ResolveInput(EndurancePilot.Core.NavigationKey.Tab, EndurancePilot.Core.NavigationStep.OpenBackpack, "I") == 0x49
+                && BackpackKey.ResolveInput(EndurancePilot.Core.NavigationKey.Tab, EndurancePilot.Core.NavigationStep.OpenTargetExitBackpack, "I") == 0x49
+                && BackpackKey.ResolveInput(EndurancePilot.Core.NavigationKey.Tab, EndurancePilot.Core.NavigationStep.OpenQuestMenu, "I") == 0x09
+                && BackpackKey.ResolveInput(EndurancePilot.Core.NavigationKey.Tab, EndurancePilot.Core.NavigationStep.RetryQuestMenu, "I") == 0x09);
+            bool invalidKeyRejected = false;
+            try { (new RunnerSettings(BackpackKeybind: "invalid")).Validate(); }
+            catch (InvalidDataException) { invalidKeyRejected = true; }
+            Check("Invalid backpack key is rejected", invalidKeyRejected);
+            var saved = new RunnerSettings(EndurancePilot.Core.HomebaseZone.CannyValley, 3, false, false, CloseToTray: false, StartWithWindows: true, AutoImportPenny: false, BackpackKeybind: "I");
             store.Save(saved);
             Check("Preferences survive a new store instance", new SettingsStore(path).Load(out warning) == saved && warning is null);
             saved = saved with
@@ -76,6 +86,9 @@ internal static class SettingsChecks
             try
             {
                 Check("New app host restores all saved runner preferences", host.ReadSettings() == saved with { Webhook = new WebhookSettings() });
+                host.ApplySettings(host.ReadSettings() with { BackpackKeybind = "B" });
+                Check("Backpack key changes persist through the host", host.ReadSettings().BackpackKeybind == "B"
+                    && new SettingsStore(path).Load(out warning).BackpackKeybind == "B");
                 host.SetAutoResume(true, 17);
                 Check("Auto resume changes without restarting the host", host.ReadSettings() is { AutoResumeFortnite: true, AutoResumeIdleSeconds: 17 }
                     && store.Load(out warning).AutoResumeIdleSeconds == 17);

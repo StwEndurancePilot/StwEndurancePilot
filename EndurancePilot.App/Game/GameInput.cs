@@ -40,7 +40,7 @@ internal static class GameInput
     }
 
     public static async Task<bool> DispatchAsync(GameWindow game, Bitmap observedImage, ClickAction action,
-        OcrService ocr, Func<bool> sessionIsCurrent, CancellationToken cancellation)
+        OcrService ocr, Func<bool> sessionIsCurrent, CancellationToken cancellation, string backpackKeybind = BackpackKey.Default)
     {
         if (action.Step == NavigationStep.SearchSaveTheWorld && !DiscoveryNavigation.IsSearchAction(action))
         {
@@ -108,15 +108,7 @@ internal static class GameInput
                 throw new InvalidOperationException("Keyboard action is not allowed for this screen.");
             }
 
-            ushort virtualKey = key switch
-            {
-                NavigationKey.C => 0x43,
-                NavigationKey.Space => 0x20,
-                NavigationKey.E => 0x45,
-                NavigationKey.Tab => 0x09,
-                NavigationKey.Escape => 0x1B,
-                _ => throw new InvalidOperationException("Unsupported key")
-            };
+            ushort virtualKey = BackpackKey.ResolveInput(key, action.Step, backpackKeybind);
             foreach (int heldKey in new[] { (int)virtualKey, 0x10, 0x11, 0x12, 0x41, 0x57, 0x53, 0x44 })
             {
                 if ((GetAsyncKeyState(heldKey) & 0x8000) != 0)

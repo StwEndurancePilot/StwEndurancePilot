@@ -50,6 +50,7 @@ public sealed partial class MainForm : Form
     private bool busy;
     private bool stopHotkeyRegistered;
     private string startStopHotkey = RunnerHotkey.Default;
+    private string backpackKeybind = BackpackKey.Default;
     private Button? stopButton;
     private bool closed;
     private int session;
@@ -97,6 +98,7 @@ public sealed partial class MainForm : Form
         var saved = settingsStore.Load(out var settingsWarning);
         SettingsWarning = settingsWarning;
         startStopHotkey = saved.StartStopHotkey;
+        backpackKeybind = saved.BackpackKeybind;
         stopButton.Text = "Stop · " + startStopHotkey;
         webhook = saved.Webhook ?? new();
         notifier.Configure(webhook);
@@ -781,7 +783,7 @@ public sealed partial class MainForm : Form
                     {
                         var inputClock = System.Diagnostics.Stopwatch.StartNew();
                         if (!await GameInput.DispatchAsync(game, image, action, ocr!,
-                            () => !closed && capturedSession == session, closing.Token))
+                            () => !closed && capturedSession == session, closing.Token, backpackKeybind))
                         {
                             return;
                         }

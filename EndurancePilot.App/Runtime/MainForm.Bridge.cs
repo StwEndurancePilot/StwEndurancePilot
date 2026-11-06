@@ -48,7 +48,7 @@ public sealed partial class MainForm
 
     internal RunnerSettings ReadSettings() => new((HomebaseZone)zone.SelectedItem!, (int)runLimit.Value,
         launchIfMissing.Checked, indefinite.Checked, manualThemeEnabled, manualDarkTheme, targetWave, webhook,
-        endRunWhenTargetReached, waitForAssistance, autoResumeFortnite, autoResumeIdleSeconds, startStopHotkey, closeToTray, startWithWindows, autoImportPenny);
+        endRunWhenTargetReached, waitForAssistance, autoResumeFortnite, autoResumeIdleSeconds, startStopHotkey, closeToTray, startWithWindows, autoImportPenny, backpackKeybind);
     internal void SetLifecycle(bool closeToTray, bool startup)
     {
         bool previousStartup = startWithWindows;
@@ -150,6 +150,7 @@ public sealed partial class MainForm
         targetWave = value.TargetWave;
         endRunWhenTargetReached = value.EndRunWhenTargetReached;
         waitForAssistance = value.WaitForAssistance;
+        backpackKeybind = value.BackpackKeybind;
         closeToTray = value.CloseToTray;
         startWithWindows = value.StartWithWindows; autoImportPenny = value.AutoImportPenny;
         autoResumeFortnite = value.AutoResumeFortnite;

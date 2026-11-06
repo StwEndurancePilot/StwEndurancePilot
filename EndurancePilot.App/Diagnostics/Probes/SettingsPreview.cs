@@ -66,6 +66,7 @@ internal static class SettingsPreview
             }
 
             var pane = new SettingsPane(new(), _ => null, _ => null, _ => null, _ => null, _ => null, _ => Task.FromResult("Offline preview"), _ => null, _ => null, (_, _) => null, _ => null);
+            pane.ConfigureBackpackKey("I", _ => null);
             pane.SetRunning(false);
             pane.SetWebhookStatus("Notifications are off.");
             pane.Measure(new System.Windows.Size(width, 650));

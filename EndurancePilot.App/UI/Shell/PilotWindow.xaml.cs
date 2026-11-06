@@ -548,6 +548,15 @@ public partial class PilotWindow : FluentWindow
             }
             catch (Exception error) { return error.Message; }
         });
+        settingsPane.ConfigureBackpackKey(host.ReadSettings().BackpackKeybind, key =>
+        {
+            try
+            {
+                host.ApplySettings(host.ReadSettings() with { BackpackKeybind = key });
+                return null;
+            }
+            catch (Exception error) { return error.Message; }
+        });
         settingsPane.ConfigureLifecycle(host.ReadSettings(), (closeToTray, startup) =>
         {
             try { host.SetLifecycle(closeToTray, startup); return null; }

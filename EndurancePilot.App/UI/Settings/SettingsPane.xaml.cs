@@ -20,6 +20,26 @@ public partial class SettingsPane : System.Windows.Controls.UserControl
         CloseToTrayToggle.Checked += Changed; CloseToTrayToggle.Unchecked += Changed;
         StartupToggle.Checked += Changed; StartupToggle.Unchecked += Changed;
     }
+    internal void ConfigureBackpackKey(string key, Func<string, string?> save)
+    {
+        string saved = key;
+        bool changing = false;
+        BackpackKeyChoice.ItemsSource = BackpackKey.Choices;
+        BackpackKeyChoice.SelectedItem = saved;
+        BackpackKeyChoice.SelectionChanged += (_, _) =>
+        {
+            if (changing || BackpackKeyChoice.SelectedItem is not string next || next == saved) return;
+            string? error = save(next);
+            if (error is null) saved = next;
+            else
+            {
+                changing = true;
+                BackpackKeyChoice.SelectedItem = saved;
+                changing = false;
+            }
+            ShowSaveResult(error);
+        };
+    }
     public event EventHandler? BackRequested;
     internal void ConfigurePennyImport(bool enabled, Func<bool, string?> save)
     {
