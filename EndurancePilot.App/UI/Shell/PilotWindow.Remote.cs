@@ -13,7 +13,7 @@ public partial class PilotWindow
         remote.Start();
     }
 
-    private void DiscordClicked(object sender, System.Windows.RoutedEventArgs e) => OpenRemote();
+    private void DiscordClicked(object sender, System.Windows.RoutedEventArgs e) => OpenCommunity();
 
     private void OpenRemote()
     {

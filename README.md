@@ -24,6 +24,8 @@ Settings saves keep a `settings.json.bak` recovery copy and preserve fields intr
 
 ## Discord remote control
 
+On first opening Pilot, the community prompt requires **Join now** to open the OSS STW Discord invite. Pilot remembers that the invite was opened on this Windows account and does not prompt again after restarts or updates. This does not verify server membership. The top-right Discord button reopens the invitation; remote pairing remains available through the account menu and Settings. Quiet tray startup defers the prompt until Pilot is shown.
+
 Pilot also includes an opt-in Discord application hosted in its own Cloudflare Worker. Pair your PC from **Epic account menu → Discord remote control** to request progress and statistics, manage accounts, approve Epic sign-in, capture the Fortnite window, show Pilot, and start or stop the runner. Pairing enables game/account actions and Fortnite screenshots. Disconnect to revoke access. Pilot must remain open on your PC.
 
 See [Discord application setup and security](docs/discord-application.md) for deployment through GitHub environment secrets, pairing, commands, privacy boundaries and self-hosting. The source contains no shared bot or deployment token. The hosted Discord application must be configured and deployed before pairing is available.

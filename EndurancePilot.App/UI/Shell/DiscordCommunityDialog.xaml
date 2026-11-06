@@ -1,0 +1,25 @@
+<ui:FluentWindow x:Class="EndurancePilot.App.DiscordCommunityDialog" x:ClassModifier="internal"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+ Title="Join our Discord server" Width="410" SizeToContent="Height" ResizeMode="NoResize"
+ WindowStyle="None" WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+ Background="{DynamicResource PilotBackground}" Foreground="{DynamicResource PilotText}"
+ FontFamily="Segoe UI Variable, Segoe UI" WindowBackdropType="None" UseLayoutRounding="True">
+ <Border Padding="28" Background="{DynamicResource PilotBackground}" BorderBrush="{DynamicResource PilotBorder}" BorderThickness="1">
+  <StackPanel>
+   <TextBlock Text="THE OSS STW COMMUNITY" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PilotSecondary}" />
+   <TextBlock Text="Better with the community." FontSize="26" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,12,0,12" />
+   <TextBlock Text="Join our Discord server for giveaways, the latest updates, and a place to connect with other members." TextWrapping="Wrap" FontSize="13" LineHeight="21" Foreground="{DynamicResource PilotSecondary}" />
+   <StackPanel Margin="0,22,0,22">
+    <TextBlock Text="Community giveaways" Margin="0,0,0,10" />
+    <TextBlock Text="Updates &amp; announcements" Margin="0,0,0,10" />
+    <TextBlock Text="Tips, support &amp; other players" />
+   </StackPanel>
+   <TextBlock Text="Open the invite once to continue. Pilot will remember this on this Windows account." FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource PilotSecondary}" Margin="0,0,0,18" />
+   <TextBlock x:Name="ErrorText" Visibility="Collapsed" TextWrapping="Wrap" Foreground="{DynamicResource PilotWarning}" Margin="0,0,0,14" AutomationProperties.LiveSetting="Assertive" />
+   <ui:Button x:Name="JoinButton" Content="Join now ↗" Click="JoinClicked" HorizontalAlignment="Stretch" Height="44" Background="#5865F2" Foreground="White" AutomationProperties.Name="Join our Discord server" />
+   <ui:Button x:Name="DismissButton" Content="Close" Click="DismissClicked" HorizontalAlignment="Stretch" Margin="0,8,0,0" Visibility="Collapsed" />
+  </StackPanel>
+ </Border>
+</ui:FluentWindow>

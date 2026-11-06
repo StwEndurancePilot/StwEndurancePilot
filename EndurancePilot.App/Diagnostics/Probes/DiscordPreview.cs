@@ -54,6 +54,21 @@ internal static class DiscordPreview
                 encoder.Save(file);
             }
             dialog.Close();
+            var community = new DiscordCommunity(Path.Combine(Path.GetFullPath(output), "preview-community.json"), _ => { });
+            var welcome = new DiscordCommunityDialog(community);
+            var welcomeContent = (FrameworkElement)welcome.Content;
+            welcomeContent.Measure(new System.Windows.Size(410, double.PositiveInfinity));
+            int welcomeHeight = (int)Math.Ceiling(welcomeContent.DesiredSize.Height);
+            welcomeContent.Arrange(new Rect(0, 0, 410, welcomeHeight));
+            welcomeContent.UpdateLayout();
+            var welcomeBitmap = new RenderTargetBitmap(410, welcomeHeight, 96, 96, PixelFormats.Pbgra32);
+            welcomeBitmap.Render(welcomeContent);
+            var welcomeEncoder = new PngBitmapEncoder();
+            welcomeEncoder.Frames.Add(BitmapFrame.Create(welcomeBitmap));
+            using (var file = File.Create(Path.Combine(output, $"discord-community-{(dark ? "dark" : "light")}.png"))) welcomeEncoder.Save(file);
+            community.Join();
+            welcome.Close();
+            File.Delete(Path.Combine(Path.GetFullPath(output), "preview-community.json"));
         }
         app.Shutdown();
     }

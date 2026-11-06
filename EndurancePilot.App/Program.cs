@@ -9,6 +9,17 @@ static class Program
 
         ApplicationConfiguration.Initialize();
         CompactNativeLibrary.Initialize();
+        if (args.Length == 2 && args[0] == "--check-discord-community")
+        {
+            var app = new System.Windows.Application();
+            app.Resources.MergedDictionaries.Add(new Wpf.Ui.Markup.ThemesDictionary());
+            app.Resources.MergedDictionaries.Add(new Wpf.Ui.Markup.ControlsDictionary());
+            var checks = DiscordCommunityChecks.Run(args[1]);
+            File.WriteAllText(Path.Combine(args[1], "community-checks.json"), System.Text.Json.JsonSerializer.Serialize(checks, Inspection.Json));
+            Environment.ExitCode = checks.All(c => c.Passed) ? 0 : 1;
+            app.Shutdown();
+            return;
+        }
         if (args.Length == 2 && args[0] == "--analyze-current-screen")
         {
             try

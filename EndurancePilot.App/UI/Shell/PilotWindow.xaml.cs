@@ -65,7 +65,9 @@ public partial class PilotWindow : FluentWindow
             RefreshState();
             refresh.Start();
             _ = PollUpdatesAsync();
+            Dispatcher.BeginInvoke(new Action(WelcomeToCommunity));
         };
+        IsVisibleChanged += (_, _) => { if (IsVisible) Dispatcher.BeginInvoke(new Action(WelcomeToCommunity)); };
         refresh.Tick += (_, _) => RefreshState();
         Closing += (_, e) =>
         {
